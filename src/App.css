@@ -168,6 +168,115 @@
   font-weight: 700;
 }
 
+body.dark-mode {
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+body.dark-mode .app-shell,
+body.dark-mode .auth-screen,
+body.dark-mode .student-shell,
+body.dark-mode .admin-shell {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+body.dark-mode .auth-icon,
+body.dark-mode .auth-card,
+body.dark-mode .student-topbar,
+body.dark-mode .student-sidebar,
+body.dark-mode .student-stats article,
+body.dark-mode .student-entry-form,
+body.dark-mode .student-card,
+body.dark-mode .admin-topbar,
+body.dark-mode .admin-sidebar,
+body.dark-mode .admin-form-panel,
+body.dark-mode .admin-table-card,
+body.dark-mode .admin-report-card,
+body.dark-mode .admin-report-stats article,
+body.dark-mode .admin-modal,
+body.dark-mode .showcase-metric,
+body.dark-mode .showcase-card-wrap,
+body.dark-mode .timeline-item,
+body.dark-mode .panel,
+body.dark-mode .stat-card,
+body.dark-mode .project-item,
+body.dark-mode .item-list li,
+body.dark-mode .message-list li,
+body.dark-mode .submission-box {
+  background: #1e293b;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+body.dark-mode .auth-brand h1,
+body.dark-mode .auth-brand p,
+body.dark-mode .auth-card h2,
+body.dark-mode .auth-card p,
+body.dark-mode .auth-form label,
+body.dark-mode .student-profile p,
+body.dark-mode .admin-brand p,
+body.dark-mode .admin-head-row p,
+body.dark-mode .admin-table-head p,
+body.dark-mode .admin-report-stats p,
+body.dark-mode .admin-report-card p,
+body.dark-mode .timeline-item p,
+body.dark-mode .timeline-item small,
+body.dark-mode .description,
+body.dark-mode .hint,
+body.dark-mode .project-item small,
+body.dark-mode .summary-label,
+body.dark-mode .stat-card span,
+body.dark-mode .temp-users p {
+  color: #94a3b8;
+}
+
+body.dark-mode .auth-role-toggle,
+body.dark-mode .student-sidebar button.active,
+body.dark-mode .admin-sidebar button.active,
+body.dark-mode .student-tabs,
+body.dark-mode .role-toggle,
+body.dark-mode .admin-bar-track,
+body.dark-mode .temp-users {
+  background: #334155;
+}
+
+body.dark-mode .auth-role-toggle button,
+body.dark-mode .auth-role-toggle button.active,
+body.dark-mode .student-sidebar button,
+body.dark-mode .admin-sidebar button,
+body.dark-mode .role-toggle button,
+body.dark-mode .top-bar p,
+body.dark-mode .top-bar h1,
+body.dark-mode .admin-table th,
+body.dark-mode .admin-table td,
+body.dark-mode .admin-modal label,
+body.dark-mode .admin-modal-head p,
+body.dark-mode .admin-modal-close,
+body.dark-mode .summary-value,
+body.dark-mode .student-profile h3,
+body.dark-mode .admin-brand h1,
+body.dark-mode .admin-head-row h2 {
+  color: #e2e8f0;
+}
+
+body.dark-mode .auth-form input,
+body.dark-mode .admin-search,
+body.dark-mode .admin-modal input,
+body.dark-mode .admin-modal select,
+body.dark-mode .table-search,
+body.dark-mode input,
+body.dark-mode textarea,
+body.dark-mode select {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+body.dark-mode .link-btn {
+  color: #93c5fd;
+}
+
 .student-shell {
   min-height: 100vh;
   background: #f5f6fa;
