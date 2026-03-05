@@ -159,6 +159,31 @@ body.dark-mode .auth-form {
   border: 1px solid #334155;
 }
 
+body.dark-mode .auth-brand h1,
+body.dark-mode .auth-brand p,
+body.dark-mode .auth-form h2,
+body.dark-mode .auth-subtext,
+body.dark-mode .auth-form label {
+  color: #e2e8f0;
+}
+
+body.dark-mode .auth-logo {
+  background: #1e293b;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35);
+}
+
+body.dark-mode .role-toggle {
+  background: #334155;
+}
+
+body.dark-mode .role-toggle button {
+  color: #e2e8f0;
+}
+
+body.dark-mode .role-toggle .active {
+  background: #0f172a;
+}
+
 body.dark-mode .auth-form input,
 body.dark-mode .auth-form select {
   background: #0f172a;
@@ -174,6 +199,11 @@ body.dark-mode .auth-form h1 {
 
 body.dark-mode .secondary-btn {
   background: #64748b;
+}
+
+body.dark-mode .demo-box {
+  background: #334155;
+  color: #cbd5e1;
 }
 
 @media (max-width: 1200px) {

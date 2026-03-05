@@ -667,6 +667,130 @@ th {
   margin-block-end: 6px;
 }
 
+body.dark-mode {
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+body.dark-mode .portal-shell,
+body.dark-mode .dashboard-content,
+body.dark-mode .single-page-content {
+  background: #0f172a;
+}
+
+body.dark-mode .portal-topbar,
+body.dark-mode .portal-sidebar,
+body.dark-mode .navbar,
+body.dark-mode .sidebar,
+body.dark-mode .stat-card,
+body.dark-mode .record-card,
+body.dark-mode .showcase-card,
+body.dark-mode .table-card,
+body.dark-mode .chart-card,
+body.dark-mode .card,
+body.dark-mode .summary-card,
+body.dark-mode .panel,
+body.dark-mode .modal-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+body.dark-mode .sidebar-link,
+body.dark-mode .sidebar-action,
+body.dark-mode .topbar-name,
+body.dark-mode .page-head h1,
+body.dark-mode .record-card h3,
+body.dark-mode .showcase-card h3,
+body.dark-mode .table-card h3,
+body.dark-mode .chart-card h3,
+body.dark-mode th,
+body.dark-mode td,
+body.dark-mode .card h3,
+body.dark-mode .summary-value,
+body.dark-mode .panel h4,
+body.dark-mode .modal-card h3,
+body.dark-mode .modal-card label {
+  color: #f8fafc;
+}
+
+body.dark-mode .topbar-meta,
+body.dark-mode .page-head p,
+body.dark-mode .record-card p,
+body.dark-mode .record-foot span,
+body.dark-mode .table-card p,
+body.dark-mode .chart-card p,
+body.dark-mode .muted-line,
+body.dark-mode .bar-item span,
+body.dark-mode .timeline-list li span,
+body.dark-mode .summary-label,
+body.dark-mode .card p,
+body.dark-mode .modal-card p {
+  color: #94a3b8;
+}
+
+body.dark-mode .sidebar-link:hover,
+body.dark-mode .sidebar-action.active,
+body.dark-mode .segmented-tabs,
+body.dark-mode .pill.muted {
+  background: #334155;
+}
+
+body.dark-mode .segmented-tabs .active,
+body.dark-mode .role-toggle .active,
+body.dark-mode .role-toggle button,
+body.dark-mode .icon-btn,
+body.dark-mode .outline-btn,
+body.dark-mode .danger-ghost,
+body.dark-mode .primary-dark-btn,
+body.dark-mode .btn,
+body.dark-mode button {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+body.dark-mode .table-search,
+body.dark-mode .modal-card input,
+body.dark-mode .select-filter,
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea {
+  background: #0f172a;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
+body.dark-mode .table-search::placeholder,
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: #94a3b8;
+}
+
+body.dark-mode th,
+body.dark-mode td {
+  border-block-end-color: #334155;
+}
+
+body.dark-mode .big-chip {
+  background: #1e1b4b;
+  border-color: #4338ca;
+}
+
+body.dark-mode .big-chip strong,
+body.dark-mode .big-chip span,
+body.dark-mode .pill.info {
+  color: #c7d2fe;
+}
+
+body.dark-mode .pill.info {
+  background: #312e81;
+}
+
+body.dark-mode .pill.badge {
+  color: #fde68a;
+  background: #78350f;
+}
+
 @media (max-width: 1200px) {
   .portal-layout {
     grid-template-columns: 1fr;
