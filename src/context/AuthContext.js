@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState } from 'react';
-import { loginUser, signupUser } from '../services/authService';
+import { loginUser, signupUser, verifyStaffOtp } from '../services/authService';
 
 const AuthContext = createContext(null);
 
@@ -7,9 +7,20 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
   const login = (email, password) => {
-    const loggedInUser = loginUser(email, password);
-    setUser(loggedInUser);
-    return loggedInUser;
+    const loginResult = loginUser(email, password);
+
+    if (loginResult.requiresOtp) {
+      return loginResult;
+    }
+
+    setUser(loginResult);
+    return loginResult;
+  };
+
+  const verifyOtp = (otpSessionId, otpCode) => {
+    const loggedInStaff = verifyStaffOtp(otpSessionId, otpCode);
+    setUser(loggedInStaff);
+    return loggedInStaff;
   };
 
   const signup = (name, email, password, role) => {
@@ -24,6 +35,7 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       login,
+      verifyOtp,
       signup,
       logout
     }),

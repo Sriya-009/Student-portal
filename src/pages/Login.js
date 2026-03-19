@@ -6,25 +6,47 @@ import '../styles/auth.css';
 function Login() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('student');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSession, setOtpSession] = useState(null);
   const [error, setError] = useState('');
-  const { login } = useAuth();
+  const { login, verifyOtp } = useAuth();
   const navigate = useNavigate();
+
+  const routeByRole = (role) => {
+    if (role === 'admin') navigate('/admin');
+    else if (role === 'faculty') navigate('/faculty');
+    else navigate('/student');
+  };
 
   const handleSubmit = (event) => {
     event.preventDefault();
     setError('');
 
     try {
-      const loggedInUser = login(identifier, password, role);
-      const userRole = loggedInUser.role;
+      if (otpSession) {
+        const verifiedUser = verifyOtp(otpSession.otpSessionId, otpCode);
+        routeByRole(verifiedUser.role);
+        return;
+      }
 
-      if (userRole === 'admin') navigate('/admin');
-      else if (userRole === 'faculty') navigate('/faculty');
-      else navigate('/student');
+      const loggedInUser = login(identifier, password);
+
+      if (loggedInUser.requiresOtp) {
+        setOtpSession(loggedInUser);
+        setOtpCode('');
+        return;
+      }
+
+      routeByRole(loggedInUser.role);
     } catch (loginError) {
       setError(loginError.message);
     }
+  };
+
+  const resetOtpStep = () => {
+    setOtpSession(null);
+    setOtpCode('');
+    setError('');
   };
 
   return (
@@ -37,81 +59,65 @@ function Login() {
 
       <form className="auth-form" onSubmit={handleSubmit}>
         <h2>Sign In</h2>
-        <p className="auth-subtext">Choose your role to access the portal</p>
+        <p className="auth-subtext">
+          {otpSession
+            ? `OTP sent to registered phone ${otpSession.maskedPhone}`
+            : 'Sign in with your credentials and role will be identified automatically'}
+        </p>
 
-        <div className="role-toggle" role="tablist" aria-label="Select role">
-          <button
-            type="button"
-            className={role === 'student' ? 'active' : ''}
-            onClick={() => {
-              setRole('student');
-              setIdentifier('');
-              setPassword('');
-              setError('');
-            }}
-          >
-            Student
-          </button>
-          <button
-            type="button"
-            className={role === 'faculty' ? 'active' : ''}
-            onClick={() => {
-              setRole('faculty');
-              setIdentifier('');
-              setPassword('');
-              setError('');
-            }}
-          >
-            Faculty
-          </button>
-          <button
-            type="button"
-            className={role === 'admin' ? 'active' : ''}
-            onClick={() => {
-              setRole('admin');
-              setIdentifier('');
-              setPassword('');
-              setError('');
-            }}
-          >
-            Admin
-          </button>
-        </div>
+        {otpSession ? (
+          <>
+            <label htmlFor="otpCode">Enter OTP</label>
+            <input
+              id="otpCode"
+              type="text"
+              placeholder="6-digit OTP"
+              value={otpCode}
+              onChange={(event) => setOtpCode(event.target.value)}
+              required
+            />
+            <p className="auth-subtext">For demo: OTP is {otpSession.demoOtp}</p>
+          </>
+        ) : (
+          <>
+            <label htmlFor="identifier">Roll Number / Email / Admin ID</label>
+            <input
+              id="identifier"
+              type="text"
+              placeholder="Enter roll number, faculty email, or admin id"
+              value={identifier}
+              onChange={(event) => setIdentifier(event.target.value)}
+              required
+            />
 
-        <label htmlFor="identifier">{role === 'student' ? 'Roll Number' : 'Email or ID'}</label>
-        <input
-          id="identifier"
-          type="text"
-          placeholder={role === 'student' ? 'Enter your roll number' : 'Enter your login id'}
-          value={identifier}
-          onChange={(event) => setIdentifier(event.target.value)}
-          required
-        />
-
-        <label htmlFor="password">Password</label>
-        <input
-          id="password"
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          required
-        />
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </>
+        )}
 
         {error ? <p className="error">{error}</p> : null}
         <button type="submit" className="btn auth-submit">
-          {role === 'student' ? 'Sign In as Student' : role === 'faculty' ? 'Sign In as Faculty' : 'Sign In as Admin'}
+          {otpSession ? 'Verify OTP' : 'Sign In'}
         </button>
+
+        {otpSession ? (
+          <button type="button" className="btn secondary-btn" onClick={resetOtpStep}>
+            Use Different Credentials
+          </button>
+        ) : null}
 
         <div className="demo-box">
           <p>Demo Credentials:</p>
-          {role === 'student' ? (
-            <p><strong>Roll Number:</strong> STU001, STU002, STU003, or STU004<br /><strong>Password:</strong> student123</p>
-          ) : role === 'faculty' ? (
-            <p><strong>Faculty Email:</strong> faculty@school.com<br /><strong>Password:</strong> faculty123</p>
-          ) : (
-            <p><strong>Admin ID:</strong> admin<br /><strong>Password:</strong> admin123</p>
-          )}
+          <p><strong>Student Roll Number:</strong> STU001, STU002, STU003, or STU004<br /><strong>Password:</strong> student123</p>
+          <p><strong>Faculty Email:</strong> faculty@school.com<br /><strong>Password:</strong> faculty123</p>
+          <p><strong>Admin ID:</strong> admin<br /><strong>Password:</strong> admin123</p>
         </div>
       </form>
     </main>

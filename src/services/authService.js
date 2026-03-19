@@ -1,21 +1,34 @@
 import { studentCredentials, students } from '../data/portalData';
 
 const users = [
-  { id: 1, name: 'Admin User', email: 'admin', password: 'admin123', role: 'admin' },
-  { id: 2, name: 'Faculty User', email: 'faculty@school.com', password: 'faculty123', role: 'faculty' }
+  { id: 1, name: 'Admin User', email: 'admin', password: 'admin123', role: 'admin', phone: '+91 98765 12345' },
+  { id: 2, name: 'Faculty User', email: 'faculty@school.com', password: 'faculty123', role: 'faculty', phone: '+91 91234 56789' }
 ];
 
-export function loginUser(identifier, password, role = 'student') {
-  if (role === 'student') {
-    const credential = studentCredentials.find(
-      (item) => item.rollNumber.toLowerCase() === identifier.toLowerCase() && item.password === password
-    );
+const otpSessions = new Map();
 
-    if (!credential) {
-      throw new Error('Invalid roll number or password');
-    }
+function generateOtpCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
-    const student = students.find((item) => item.rollNumber === credential.rollNumber);
+function maskPhone(phoneNumber) {
+  const digits = (phoneNumber || '').replace(/\D/g, '');
+  if (!digits) {
+    return '*** *** ****';
+  }
+  const lastFour = digits.slice(-4);
+  return `*** *** ${lastFour}`;
+}
+
+export function loginUser(identifier, password) {
+  const normalizedIdentifier = identifier.trim().toLowerCase();
+
+  const studentCredential = studentCredentials.find(
+    (item) => item.rollNumber.toLowerCase() === normalizedIdentifier && item.password === password
+  );
+
+  if (studentCredential) {
+    const student = students.find((item) => item.rollNumber === studentCredential.rollNumber);
 
     return {
       id: student.id,
@@ -28,19 +41,61 @@ export function loginUser(identifier, password, role = 'student') {
     };
   }
 
-  const user = users.find(
-    (item) => item.role === role && item.email.toLowerCase() === identifier.toLowerCase() && item.password === password
+  const staffUser = users.find(
+    (item) => item.email.toLowerCase() === normalizedIdentifier && item.password === password
   );
 
-  if (!user) {
-    throw new Error(`Invalid ${role} credentials`);
+  if (staffUser) {
+    const otpCode = generateOtpCode();
+    const otpSessionId = `otp-${staffUser.id}-${Date.now()}`;
+
+    otpSessions.set(otpSessionId, {
+      userId: staffUser.id,
+      otpCode,
+      expiresAt: Date.now() + (5 * 60 * 1000)
+    });
+
+    return {
+      requiresOtp: true,
+      otpSessionId,
+      maskedPhone: maskPhone(staffUser.phone),
+      role: staffUser.role,
+      demoOtp: otpCode
+    };
+  }
+
+  throw new Error('Invalid credentials');
+}
+
+export function verifyStaffOtp(otpSessionId, otpCode) {
+  const session = otpSessions.get(otpSessionId);
+
+  if (!session) {
+    throw new Error('OTP session expired. Please login again.');
+  }
+
+  if (Date.now() > session.expiresAt) {
+    otpSessions.delete(otpSessionId);
+    throw new Error('OTP expired. Please login again.');
+  }
+
+  if (session.otpCode !== otpCode.trim()) {
+    throw new Error('Invalid OTP code');
+  }
+
+  otpSessions.delete(otpSessionId);
+
+  const staffUser = users.find((item) => item.id === session.userId);
+
+  if (!staffUser) {
+    throw new Error('Unable to complete login');
   }
 
   return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role
+    id: staffUser.id,
+    name: staffUser.name,
+    email: staffUser.email,
+    role: staffUser.role
   };
 }
 
