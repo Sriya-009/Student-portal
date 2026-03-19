@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import SubmissionCalendar from '../components/SubmissionCalendar';
 import ProjectManagement from '../components/ProjectManagement';
+import ThemeToggle from '../components/ThemeToggle';
 import { students, submissionEvents } from '../data/portalData';
 import '../styles/dashboard.css';
 
@@ -34,7 +35,10 @@ function StudentDashboard() {
             <p className="topbar-meta">{currentStudent.grade} • {currentStudent.rollNumber}</p>
           </div>
         </div>
-        <button type="button" className="outline-btn" onClick={handleLogout}>Logout</button>
+        <div className="topbar-actions">
+          <ThemeToggle />
+          <button type="button" className="outline-btn" onClick={handleLogout}>Logout</button>
+        </div>
       </header>
 
       <div className="portal-layout">

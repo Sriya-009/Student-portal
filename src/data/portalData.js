@@ -203,6 +203,84 @@ export const projectTasks = [
   }
 ];
 
+export const projectFiles = [
+  {
+    id: 'FILE-001',
+    projectId: 'BTECH-PRJ-001',
+    fileName: 'Dataset_Preprocessing.zip',
+    fileSize: 2048576,
+    fileType: 'archive',
+    mimeType: 'application/zip',
+    uploadedBy: 'STU001',
+    uploadedByName: 'Emma Johnson',
+    uploadedDate: '2026-03-15',
+    version: 1,
+    description: 'Cleaned facial dataset with 5000 images',
+    downloadCount: 2,
+    isSubmitted: false
+  },
+  {
+    id: 'FILE-002',
+    projectId: 'BTECH-PRJ-001',
+    fileName: 'Model_Training_Report.pdf',
+    fileSize: 1024000,
+    fileType: 'document',
+    mimeType: 'application/pdf',
+    uploadedBy: 'STU001',
+    uploadedByName: 'Emma Johnson',
+    uploadedDate: '2026-03-18',
+    version: 2,
+    description: 'Initial training results and accuracy metrics',
+    downloadCount: 1,
+    isSubmitted: false
+  },
+  {
+    id: 'FILE-003',
+    projectId: 'BTECH-PRJ-001',
+    fileName: 'Attendance_System_Code.zip',
+    fileSize: 512000,
+    fileType: 'code',
+    mimeType: 'application/zip',
+    uploadedBy: 'STU002',
+    uploadedByName: 'Liam Chen',
+    uploadedDate: '2026-03-19',
+    version: 1,
+    description: 'Source code with OpenCV integration',
+    downloadCount: 0,
+    isSubmitted: false
+  },
+  {
+    id: 'FILE-004',
+    projectId: 'BTECH-PRJ-002',
+    fileName: 'IoT_Architecture_Diagram.pptx',
+    fileSize: 3145728,
+    fileType: 'presentation',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    uploadedBy: 'STU002',
+    uploadedByName: 'Liam Chen',
+    uploadedDate: '2026-03-14',
+    version: 1,
+    description: 'System architecture and component overview',
+    downloadCount: 1,
+    isSubmitted: false
+  },
+  {
+    id: 'FILE-005',
+    projectId: 'BTECH-PRJ-002',
+    fileName: 'Arduino_Code_v1.zip',
+    fileSize: 256000,
+    fileType: 'code',
+    mimeType: 'application/zip',
+    uploadedBy: 'STU002',
+    uploadedByName: 'Liam Chen',
+    uploadedDate: '2026-03-17',
+    version: 1,
+    description: 'Arduino firmware for IoT devices',
+    downloadCount: 2,
+    isSubmitted: false
+  }
+];
+
 export const achievements = [];
 
 export const studentCredentials = [

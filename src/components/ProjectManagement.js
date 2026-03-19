@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
-import { bTechProjects, projectChats, projectTasks } from '../data/portalData';
+import { bTechProjects, projectChats, projectTasks, projectFiles } from '../data/portalData';
 import TaskManagement from './TaskManagement';
+import FileManagement from './FileManagement';
+import ProjectFilter from './ProjectFilter';
 
 function ProjectManagement({ studentId }) {
   const [projects, setProjects] = useState(bTechProjects);
@@ -9,6 +11,8 @@ function ProjectManagement({ studentId }) {
   const [showEditForm, setShowEditForm] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [tasks, setTasks] = useState(projectTasks);
+  const [files, setFiles] = useState(projectFiles);
+  const [projectFilter, setProjectFilter] = useState('all');
   const [newProject, setNewProject] = useState({
     name: '',
     description: '',
@@ -20,8 +24,14 @@ function ProjectManagement({ studentId }) {
   const [newMessage, setNewMessage] = useState('');
 
   const studentProjects = useMemo(
-    () => projects.filter((p) => p.teamMemberIds.includes(studentId)),
-    [projects, studentId]
+    () => {
+      let filtered = projects.filter((p) => p.teamMemberIds.includes(studentId));
+      if (projectFilter !== 'all') {
+        filtered = filtered.filter((p) => p.status === projectFilter);
+      }
+      return filtered;
+    },
+    [projects, studentId, projectFilter]
   );
 
   const selectedProjectData = selectedProject ? projects.find((p) => p.id === selectedProject) : null;
@@ -103,20 +113,11 @@ function ProjectManagement({ studentId }) {
         </button>
       </section>
 
-      <section className="stats-grid three-cols">
-        <article className="stat-card">
-          <h4>Total Projects</h4>
-          <strong className="value-primary">{studentProjects.length}</strong>
-        </article>
-        <article className="stat-card">
-          <h4>Ongoing</h4>
-          <strong className="value-success">{studentProjects.filter((p) => p.status === 'ongoing').length}</strong>
-        </article>
-        <article className="stat-card">
-          <h4>Completed</h4>
-          <strong className="value-primary">{studentProjects.filter((p) => p.status === 'completed').length}</strong>
-        </article>
-      </section>
+      <ProjectFilter
+        projects={projects.filter((p) => p.teamMemberIds.includes(studentId))}
+        onFilterChange={setProjectFilter}
+        activeFilter={projectFilter}
+      />
 
       <div className="project-grid">
         <section className="project-list">
@@ -184,6 +185,13 @@ function ProjectManagement({ studentId }) {
                 </button>
                 <button
                   type="button"
+                  className={`tab-btn ${activeTab === 'files' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('files')}
+                >
+                  Files
+                </button>
+                <button
+                  type="button"
                   className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
                   onClick={() => setActiveTab('chat')}
                 >
@@ -247,6 +255,18 @@ function ProjectManagement({ studentId }) {
                   teamMembers={selectedProjectData.teamMembers}
                   projectTasks={tasks}
                   onTasksUpdate={setTasks}
+                  projectName={selectedProjectData.name}
+                />
+              )}
+
+              {activeTab === 'files' && (
+                <FileManagement
+                  projectId={selectedProjectData.id}
+                  projectLeadId={selectedProjectData.projectLeadId}
+                  currentUserId={studentId}
+                  teamMembers={selectedProjectData.teamMembers}
+                  projectFiles={files}
+                  onFilesUpdate={setFiles}
                   projectName={selectedProjectData.name}
                 />
               )}
