@@ -104,20 +104,17 @@ function ProjectManagement({ studentId }) {
 
   return (
     <div className="project-management">
-      <section className="page-head page-head-row">
-        <div>
-          <h1>My Projects</h1>
-          <p>View and manage your B.Tech projects</p>
+      <section className="workspace-top-section">
+        <ProjectWorkspaceSidebar />
+        <div className="workspace-top-actions">
+          <button type="button" className="primary-dark-btn" onClick={() => setShowCreateForm(true)}>
+            + Create New Project
+          </button>
         </div>
-        <button type="button" className="primary-dark-btn" onClick={() => setShowCreateForm(true)}>
-          + Create New Project
-        </button>
       </section>
 
       <div className="project-grid">
         <section className="project-left-column">
-          <ProjectWorkspaceSidebar />
-
           <ProjectFilter
             projects={projects.filter((p) => p.teamMemberIds.includes(studentId))}
             onFilterChange={setProjectFilter}

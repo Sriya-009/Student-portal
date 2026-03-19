@@ -1116,6 +1116,22 @@ body.dark-mode .pill.badge {
   gap: 18px;
 }
 
+.workspace-top-section {
+  margin-bottom: 14px;
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.workspace-top-section .workspace-sidebar {
+  width: min(460px, 100%);
+}
+
+.workspace-top-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .project-left-column {
   display: grid;
   gap: 14px;
