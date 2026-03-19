@@ -3,7 +3,7 @@ import PrivateRoute from './components/PrivateRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AdminDashboard from './pages/AdminDashboard';
-import FacultyDashboard from './pages/TeacherDashboard';
+import FacultyDashboard from './pages/FacultyDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import AssignTasks from './pages/AssignTasks';
 import UploadFiles from './pages/UploadFiles';

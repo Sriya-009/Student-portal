@@ -5,7 +5,8 @@ export const students = [
     name: 'Emma Johnson',
     email: 'emma.johnson@school.edu',
     grade: '10th Grade',
-    initials: 'E'
+    initials: 'E',
+    phoneNumber: '+1-555-0101'
   },
   {
     id: 'STU002',
@@ -13,7 +14,8 @@ export const students = [
     name: 'Liam Chen',
     email: 'liam.chen@school.edu',
     grade: '11th Grade',
-    initials: 'L'
+    initials: 'L',
+    phoneNumber: '+1-555-0102'
   },
   {
     id: 'STU003',
@@ -21,7 +23,8 @@ export const students = [
     name: 'Sophia Martinez',
     email: 'sophia.martinez@school.edu',
     grade: '12th Grade',
-    initials: 'S'
+    initials: 'S',
+    phoneNumber: '+1-555-0103'
   },
   {
     id: 'STU004',
@@ -29,7 +32,8 @@ export const students = [
     name: 'Noah Patel',
     email: 'noah.patel@school.edu',
     grade: '9th Grade',
-    initials: 'N'
+    initials: 'N',
+    phoneNumber: '+1-555-0104'
   }
 ];
 
@@ -292,101 +296,160 @@ export const studentCredentials = [
 
 export const submissionEvents = [
   {
-    id: 'SUB-001',
-    title: 'ALM-6 on CO-3 is due',
-    date: '2026-03-06',
-    course: 'All courses',
+    id: 'NOTIF-001',
+    title: 'CO3 Assignment - Part A',
+    description: 'Submit the CO3 assignment part A',
+    dueDate: new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString(),
+    course: 'CO3',
+    type: 'assignment'
+  },
+  {
+    id: 'NOTIF-002',
+    title: 'Database Project Submission',
+    description: 'Final submission for database project',
+    dueDate: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+    course: 'Database Systems',
     type: 'deadline'
   },
   {
-    id: 'SUB-002',
-    title: 'Quiz 1 opens',
-    date: '2026-03-07',
-    course: 'CO3',
-    type: 'quiz'
-  },
-  {
-    id: 'SUB-003',
-    title: 'Quiz 2 opens',
-    date: '2026-03-07',
-    course: 'CO3',
-    type: 'quiz'
-  },
-  {
-    id: 'SUB-004',
-    title: 'Skill in Sem Exam - Round 1',
-    date: '2026-03-12',
+    id: 'NOTIF-003',
+    title: 'Skill Lab Experiment Report',
+    description: 'Submit experiment report',
+    dueDate: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
     course: 'Skill Lab',
-    type: 'exam'
-  },
-  {
-    id: 'SUB-005',
-    title: 'Home Assignment Submission',
-    date: '2026-03-14',
-    course: 'Dynamic Programming',
-    type: 'assignment'
-  },
-  {
-    id: 'SUB-006',
-    title: 'ALMs is due',
-    date: '2026-03-15',
-    course: 'All courses',
-    type: 'deadline'
-  },
-  {
-    id: 'SUB-007',
-    title: 'Quiz 1 closes',
-    date: '2026-03-15',
-    course: 'CO3',
-    type: 'quiz'
-  },
-  {
-    id: 'SUB-008',
-    title: 'CO3 Quiz closes',
-    date: '2026-03-15',
-    course: 'CO3',
-    type: 'quiz'
-  },
-  {
-    id: 'SUB-009',
-    title: 'Skill Experiment 0 submission',
-    date: '2026-03-22',
-    course: 'Skill Lab',
-    type: 'assignment'
-  },
-  {
-    id: 'SUB-010',
-    title: 'Skill Experiment 1 submission',
-    date: '2026-03-22',
-    course: 'Skill Lab',
-    type: 'assignment'
-  },
-  {
-    id: 'SUB-011',
-    title: 'CO3 Home Assignment',
-    date: '2026-03-25',
-    course: 'CO3',
-    type: 'assignment'
-  },
-  {
-    id: 'SUB-012',
-    title: 'ALMs is due',
-    date: '2026-03-29',
-    course: 'All courses',
-    type: 'deadline'
-  },
-  {
-    id: 'SUB-013',
-    title: 'Home Assignment upload',
-    date: '2026-03-30',
-    course: 'All courses',
-    type: 'assignment'
-  },
-  {
-    id: 'SUB-014',
-    title: 'Dynamic Programming HA-3 due',
-    date: '2026-03-31',
-    course: 'Dynamic Programming',
-    type: 'assignment'
+    type: 'submission'
   }
+];
+
+// Faculty Data
+export const mentors = [
+  {
+    id: 'MENTOR-001',
+    name: 'Dr. Amelia Foster',
+    email: 'amelia.foster@institute.edu',
+    department: 'Computer Science',
+    initials: 'AF',
+    phoneNumber: '+1-555-0201',
+    specialization: 'Machine Learning',
+    assignedProjects: ['BTECH-PRJ-001', 'BTECH-PRJ-002'],
+    assignedStudents: ['STU001', 'STU002']
+  },
+  {
+    id: 'MENTOR-002',
+    name: 'Prof. James Mitchell',
+    email: 'james.mitchell@institute.edu',
+    department: 'Computer Science',
+    initials: 'JM',
+    phoneNumber: '+1-555-0202',
+    specialization: 'Web Development',
+    assignedProjects: ['BTECH-PRJ-003'],
+    assignedStudents: ['STU003', 'STU004']
+  },
+  {
+    id: 'MENTOR-003',
+    name: 'Dr. Rachel Chen',
+    email: 'rachel.chen@institute.edu',
+    department: 'Electronics',
+    initials: 'RC',
+    phoneNumber: '+1-555-0203',
+    specialization: 'IoT & Embedded Systems',
+    assignedProjects: ['BTECH-PRJ-004'],
+    assignedStudents: ['STU002']
+  }
+];
+
+export const projectProposals = [
+  {
+    id: 'PROPOSAL-001',
+    projectId: 'BTECH-PRJ-001',
+    studentId: 'STU001',
+    title: 'AI-Based Attendance System',
+    description: 'Face recognition attendance system using OpenCV and ML.',
+    suggestedBy: 'STU001',
+    status: 'approved',
+    submittedDate: '2026-01-15',
+    approvedDate: '2026-01-20',
+    feedbackFromFaculty: 'Excellent proposal. Good scope and feasibility.',
+    assignedMentor: 'MENTOR-001'
+  },
+  {
+    id: 'PROPOSAL-002',
+    projectId: 'BTECH-PRJ-002',
+    studentId: 'STU002',
+    title: 'Smart Home Automation',
+    description: 'IoT-based home automation system with mobile app control.',
+    suggestedBy: 'STU002',
+    status: 'approved',
+    submittedDate: '2026-02-01',
+    approvedDate: '2026-02-05',
+    feedbackFromFaculty: 'Good project. Consider database optimization.',
+    assignedMentor: 'MENTOR-001'
+  },
+  {
+    id: 'PROPOSAL-003',
+    projectId: null,
+    studentId: 'STU004',
+    title: 'Blockchain-Based Supply Chain',
+    description: 'Using blockchain for transparent supply chain management.',
+    suggestedBy: 'STU004',
+    status: 'pending',
+    submittedDate: '2026-03-15',
+    approvedDate: null,
+    feedbackFromFaculty: null,
+    assignedMentor: null
+  }
+];
+
+export const projectGrades = [
+  {
+    id: 'GRADE-001',
+    projectId: 'BTECH-PRJ-001',
+    studentId: 'STU001',
+    proposalMark: 18,
+    progressMark: 0,
+    implementationMark: 0,
+    finalSubmissionMark: 0,
+    totalMark: 18,
+    maxMark: 100,
+    status: 'in-progress',
+    evaluatedBy: 'MENTOR-001',
+    evaluationDate: '2026-03-15',
+    comments: 'Good progress so far. Keep up the momentum.'
+  },
+  {
+    id: 'GRADE-002',
+    projectId: 'BTECH-PRJ-002',
+    studentId: 'STU002',
+    proposalMark: 19,
+    progressMark: 16,
+    implementationMark: 0,
+    finalSubmissionMark: 0,
+    totalMark: 35,
+    maxMark: 100,
+    status: 'in-progress',
+    evaluatedBy: 'MENTOR-001',
+    evaluationDate: '2026-03-15',
+    comments: 'Strong implementation so far.'
+  },
+  {
+    id: 'GRADE-003',
+    projectId: 'BTECH-PRJ-003',
+    studentId: 'STU003',
+    proposalMark: 17,
+    progressMark: 15,
+    implementationMark: 0,
+    finalSubmissionMark: 0,
+    totalMark: 32,
+    maxMark: 100,
+    status: 'in-progress',
+    evaluatedBy: 'MENTOR-002',
+    evaluationDate: '2026-03-15',
+    comments: 'Excellent teamwork demonstrated.'
+  }
+];
+
+export const facultyCredentials = [
+  { facultyId: 'MENTOR-001', password: 'faculty123' },
+  { facultyId: 'MENTOR-002', password: 'faculty123' },
+  { facultyId: 'MENTOR-003', password: 'faculty123' }
 ];

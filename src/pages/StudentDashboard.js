@@ -5,6 +5,7 @@ import SubmissionCalendar from '../components/SubmissionCalendar';
 import ProjectManagement from '../components/ProjectManagement';
 import ThemeToggle from '../components/ThemeToggle';
 import ProjectWorkspaceSidebar from '../components/ProjectWorkspaceSidebar';
+import NotificationPanel from '../components/NotificationPanel';
 import { students, submissionEvents } from '../data/portalData';
 import '../styles/dashboard.css';
 
@@ -66,6 +67,12 @@ function StudentDashboard() {
         </aside>
 
         <main className="portal-main">
+          <NotificationPanel 
+            events={submissionEvents}
+            studentId={currentStudent.rollNumber}
+            phoneNumber={currentStudent.phoneNumber}
+            studentName={currentStudent.name}
+          />
           {activeView === 'projects' ? (
             <ProjectManagement
               studentId={currentStudent.rollNumber}

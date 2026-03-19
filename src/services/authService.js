@@ -1,4 +1,4 @@
-import { studentCredentials, students } from '../data/portalData';
+import { studentCredentials, students, facultyCredentials, mentors } from '../data/portalData';
 
 const users = [
   { id: 1, name: 'Admin User', email: 'admin', password: 'admin123', role: 'admin', phone: '+91 98765 12345' },
@@ -23,6 +23,7 @@ function maskPhone(phoneNumber) {
 export function loginUser(identifier, password) {
   const normalizedIdentifier = identifier.trim().toLowerCase();
 
+  // Check student credentials
   const studentCredential = studentCredentials.find(
     (item) => item.rollNumber.toLowerCase() === normalizedIdentifier && item.password === password
   );
@@ -41,6 +42,28 @@ export function loginUser(identifier, password) {
     };
   }
 
+  // Check faculty credentials
+  const facultyCredential = facultyCredentials.find(
+    (item) => item.facultyId.toLowerCase() === normalizedIdentifier && item.password === password
+  );
+
+  if (facultyCredential) {
+    const mentor = mentors.find((item) => item.id === facultyCredential.facultyId);
+    if (mentor) {
+      return {
+        id: mentor.id,
+        name: mentor.name,
+        email: mentor.email,
+        role: 'faculty',
+        facultyId: mentor.id,
+        department: mentor.department,
+        specialization: mentor.specialization,
+        initials: mentor.initials
+      };
+    }
+  }
+
+  // Check other staff users
   const staffUser = users.find(
     (item) => item.email.toLowerCase() === normalizedIdentifier && item.password === password
   );
