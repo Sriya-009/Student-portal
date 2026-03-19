@@ -38,7 +38,15 @@ function FacultyDashboard() {
   const renderActiveView = () => {
     switch (activeView) {
       case 'approval':
-        return <ProjectApprovalPanel proposals={projectProposals} mentors={mentors} activeAction={activeAction} />;
+        return (
+          <ProjectApprovalPanel
+            proposals={projectProposals}
+            mentors={mentors}
+            projects={bTechProjects}
+            students={students}
+            activeAction={activeAction}
+          />
+        );
       case 'monitoring':
         return <ProjectMonitoringPanel projects={bTechProjects} tasks={projectTasks} activeAction={activeAction} />;
       case 'tasks':
@@ -58,7 +66,7 @@ function FacultyDashboard() {
       case 'final-actions':
         return <FinalActionsPanel projects={bTechProjects} activeAction={activeAction} />;
       default:
-        return <ProjectApprovalPanel proposals={projectProposals} mentors={mentors} />;
+        return <ProjectApprovalPanel proposals={projectProposals} mentors={mentors} projects={bTechProjects} students={students} />;
     }
   };
 

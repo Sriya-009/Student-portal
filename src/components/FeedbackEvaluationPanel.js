@@ -9,6 +9,9 @@ function FeedbackEvaluationPanel({ grades, facultyId, activeAction }) {
   );
   const [selectedGrade, setSelectedGrade] = useState(null);
   const [feedback, setFeedback] = useState('');
+  const [projectSearch, setProjectSearch] = useState('');
+  const [performanceSearch, setPerformanceSearch] = useState('');
+  const [performanceFilter, setPerformanceFilter] = useState('all');
 
   const handleAddFeedback = () => {
     if (!feedback.trim() || !selectedGrade) {
@@ -56,6 +59,15 @@ function FeedbackEvaluationPanel({ grades, facultyId, activeAction }) {
   };
 
   const inProgressGrades = gradesState.filter((g) => g.status === 'in-progress' || g.status === 'graded');
+  const filteredInProgressGrades = inProgressGrades.filter((grade) => {
+    const query = projectSearch.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      grade.projectId.toLowerCase().includes(query)
+      || grade.studentId.toLowerCase().includes(query)
+      || String(grade.totalMark).includes(query)
+    );
+  });
   const averageMark = gradesState.length > 0 
     ? Math.round(gradesState.reduce((sum, g) => sum + g.totalMark, 0) / gradesState.length)
     : 0;
@@ -66,6 +78,37 @@ function FeedbackEvaluationPanel({ grades, facultyId, activeAction }) {
   const showSuggestImprovements = activeAction === 'feedback-suggest';
   const showEvaluationStatus = activeAction === 'feedback-status';
   const showPerformanceNotes = activeAction === 'feedback-notes';
+
+  const getPerformancePriority = (grade) => {
+    const percent = grade.maxMark > 0 ? (grade.totalMark / grade.maxMark) * 100 : 0;
+    if (percent < 40 || grade.progressMark < 10) return 'needs-attention';
+    if (percent < 70) return 'watch';
+    return 'on-track';
+  };
+
+  const getNextAction = (grade) => {
+    const priority = getPerformancePriority(grade);
+    if (priority === 'needs-attention') {
+      return 'Schedule mentor check-in and assign a focused improvement task this week.';
+    }
+    if (priority === 'watch') {
+      return 'Request incremental update and verify implementation milestones.';
+    }
+    return 'Continue current pace and prepare final submission checkpoints.';
+  };
+
+  const performanceGrades = gradesState.filter((grade) => {
+    const query = performanceSearch.trim().toLowerCase();
+    const priority = getPerformancePriority(grade);
+    const matchesQuery = !query
+      || grade.projectId.toLowerCase().includes(query)
+      || grade.studentId.toLowerCase().includes(query)
+      || (grade.comments || '').toLowerCase().includes(query);
+    const matchesFilter = performanceFilter === 'all' || performanceFilter === priority;
+    return matchesQuery && matchesFilter;
+  });
+
+  const needsAttentionCount = gradesState.filter((grade) => getPerformancePriority(grade) === 'needs-attention').length;
 
   return (
     <section className="faculty-panel feedback-panel">
@@ -90,13 +133,21 @@ function FeedbackEvaluationPanel({ grades, facultyId, activeAction }) {
             <h3>{showSuggestImprovements ? 'Suggest Improvements' : 'Provide Feedback'}</h3>
 
             <div className="feedback-form" style={{ marginBottom: '24px' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Search project by project ID or student ID"
+                value={projectSearch}
+                onChange={(e) => setProjectSearch(e.target.value)}
+              />
+
               <select
                 value={selectedGrade || ''}
                 onChange={(e) => setSelectedGrade(e.target.value || null)}
                 className="form-select"
               >
                 <option value="">Select Student Project</option>
-                {inProgressGrades.map((grade) => (
+                {filteredInProgressGrades.map((grade) => (
                   <option key={grade.id} value={grade.id}>
                     {grade.projectId} - {grade.studentId} - Score: {grade.totalMark}/{grade.maxMark}
                   </option>
@@ -126,11 +177,35 @@ function FeedbackEvaluationPanel({ grades, facultyId, activeAction }) {
         {(showProvideFeedback || showReviewComments || showPerformanceNotes) && (
           <>
             <h3>{showReviewComments ? 'Review Comments' : showPerformanceNotes ? 'Performance Notes' : 'Recent Evaluations & Feedback'}</h3>
+
+            {showPerformanceNotes ? (
+              <div className="feedback-form" style={{ marginBottom: '16px' }}>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Search by project ID, student ID, or note"
+                  value={performanceSearch}
+                  onChange={(e) => setPerformanceSearch(e.target.value)}
+                />
+                <select
+                  className="form-select"
+                  value={performanceFilter}
+                  onChange={(e) => setPerformanceFilter(e.target.value)}
+                >
+                  <option value="all">All Priorities</option>
+                  <option value="needs-attention">Needs Attention</option>
+                  <option value="watch">Watch</option>
+                  <option value="on-track">On Track</option>
+                </select>
+                <p className="muted-line">Needs Attention: <strong>{needsAttentionCount}</strong></p>
+              </div>
+            ) : null}
+
             <div className="feedback-list">
-              {gradesState.length === 0 ? (
+              {(showPerformanceNotes ? performanceGrades : gradesState).length === 0 ? (
                 <p className="empty-state">No evaluations available.</p>
               ) : (
-                gradesState.map((grade) => (
+                (showPerformanceNotes ? performanceGrades : gradesState).map((grade) => (
                   <div key={grade.id} className={`feedback-card ${grade.status}`}>
                     <div className="feedback-header">
                       <div>
@@ -139,6 +214,12 @@ function FeedbackEvaluationPanel({ grades, facultyId, activeAction }) {
                       </div>
                       <span className={`status-badge ${grade.status}`}>{grade.status}</span>
                     </div>
+
+                    {showPerformanceNotes ? (
+                      <p className="muted-line" style={{ margin: '6px 0 10px' }}>
+                        Priority: <strong>{getPerformancePriority(grade).replace('-', ' ')}</strong>
+                      </p>
+                    ) : null}
 
                     <div className="feedback-scores">
                       <div className="score-item">
@@ -164,6 +245,10 @@ function FeedbackEvaluationPanel({ grades, facultyId, activeAction }) {
                     </div>
 
                     {grade.comments && <p className="feedback-comment"><strong>{showPerformanceNotes ? 'Performance Note:' : 'Feedback:'}</strong> {grade.comments}</p>}
+
+                    {showPerformanceNotes ? (
+                      <p className="feedback-comment"><strong>Next Action:</strong> {getNextAction(grade)}</p>
+                    ) : null}
 
                     {grade.feedbackList && grade.feedbackList.length > 0 && (
                       <div className="feedback-history">

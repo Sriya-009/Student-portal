@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { bTechProjects, projectChats, projectTasks, projectFiles, projectProposals, projectGrades } from '../data/portalData';
 import TaskManagement from './TaskManagement';
 import FileManagement from './FileManagement';
@@ -53,6 +53,7 @@ function ProjectManagement({ studentId, workspaceAction }) {
     references: false
   });
   const [workspaceMode, setWorkspaceMode] = useState('default');
+  const lastHandledActionRef = useRef(null);
 
   const studentProjects = useMemo(
     () => {
@@ -229,6 +230,12 @@ function ProjectManagement({ studentId, workspaceAction }) {
       return;
     }
 
+    const actionKey = `${workspaceAction.id}-${workspaceAction.timestamp || ''}`;
+    if (lastHandledActionRef.current === actionKey) {
+      return;
+    }
+    lastHandledActionRef.current = actionKey;
+
     const allStudentProjects = projects.filter((p) => p.teamMemberIds.includes(studentId));
     const firstProject = allStudentProjects[0];
     const leadProject = allStudentProjects.find((p) => p.projectLeadId === studentId) || firstProject;
@@ -249,9 +256,41 @@ function ProjectManagement({ studentId, workspaceAction }) {
         setWorkspaceNotice('Create a new project using the form.');
         break;
       case 'delete-project': {
-        const targetProject = allStudentProjects.find((p) => p.id === selectedProject) || firstProject;
-        if (!targetProject) {
+        if (allStudentProjects.length === 0) {
           setWorkspaceNotice('No project found to delete.');
+          break;
+        }
+
+        const projectOptions = allStudentProjects
+          .map((project, index) => `${index + 1}. ${project.id} - ${project.name}`)
+          .join('\n');
+
+        const selectedInput = window.prompt(
+          `Which project do you want to delete? Enter project number or ID:\n${projectOptions}`
+        );
+
+        if (selectedInput === null) {
+          setWorkspaceNotice('Project deletion cancelled.');
+          break;
+        }
+
+        const normalizedInput = selectedInput.trim();
+        if (!normalizedInput) {
+          setWorkspaceNotice('Please enter a valid project number or ID.');
+          break;
+        }
+
+        const asNumber = Number(normalizedInput);
+        const byNumber = Number.isInteger(asNumber) && asNumber >= 1 && asNumber <= allStudentProjects.length
+          ? allStudentProjects[asNumber - 1]
+          : null;
+        const byId = allStudentProjects.find(
+          (project) => project.id.toLowerCase() === normalizedInput.toLowerCase()
+        );
+        const targetProject = byNumber || byId;
+
+        if (!targetProject) {
+          setWorkspaceNotice('Project not found. Enter a listed number or exact project ID.');
           break;
         }
 
@@ -261,8 +300,12 @@ function ProjectManagement({ studentId, workspaceAction }) {
           break;
         }
 
+        const remainingProjects = allStudentProjects.filter((project) => project.id !== targetProject.id);
         setProjects((prev) => prev.filter((p) => p.id !== targetProject.id));
-        setSelectedProject((prev) => (prev === targetProject.id ? null : prev));
+        setSelectedProject((prev) => {
+          if (prev !== targetProject.id) return prev;
+          return remainingProjects[0]?.id || null;
+        });
         setWorkspaceNotice(`Project deleted: ${targetProject.name}`);
         break;
       }

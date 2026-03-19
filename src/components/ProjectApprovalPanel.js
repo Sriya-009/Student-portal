@@ -1,11 +1,11 @@
 import { useState } from 'react';
 
-function ProjectApprovalPanel({ proposals, mentors, activeAction }) {
+function ProjectApprovalPanel({ proposals, mentors, projects = [], students = [], activeAction }) {
   const [proposalsState, setProposalsState] = useState(proposals);
   const [selectedProposal, setSelectedProposal] = useState(null);
   const [feedback, setFeedback] = useState('');
   const [selectedMentor, setSelectedMentor] = useState('');
-  const [studentAssignment, setStudentAssignment] = useState({ studentId: '', mentorId: '' });
+  const [studentAssignment, setStudentAssignment] = useState({ studentId: '', projectId: '' });
   const [assignmentHistory, setAssignmentHistory] = useState([]);
 
   const handleApprove = (proposalId) => {
@@ -32,24 +32,41 @@ function ProjectApprovalPanel({ proposals, mentors, activeAction }) {
   const pendingProposals = proposalsState.filter((p) => p.status === 'pending');
   const approvedProposals = proposalsState.filter((p) => p.status === 'approved');
   const rejectedOrApprovedHistory = proposalsState.filter((p) => p.status !== 'pending');
+  const availableStudents = students.filter((student) => student.rollNumber);
 
   const handleAssignStudent = () => {
-    if (!studentAssignment.studentId.trim() || !studentAssignment.mentorId) {
-      alert('Enter student ID and select mentor.');
+    if (!studentAssignment.studentId || !studentAssignment.projectId) {
+      alert('Please choose both student and project.');
       return;
     }
 
-    const mentor = mentors.find((m) => m.id === studentAssignment.mentorId);
+    const student = availableStudents.find((item) => item.rollNumber === studentAssignment.studentId);
+    const project = projects.find((item) => item.id === studentAssignment.projectId);
+
+    if (!student || !project) {
+      alert('Selected student or project was not found.');
+      return;
+    }
+
+    const duplicate = assignmentHistory.some(
+      (entry) => entry.studentId === student.rollNumber && entry.projectId === project.id
+    );
+    if (duplicate) {
+      alert('This student is already assigned to the selected project.');
+      return;
+    }
+
     const assignment = {
       id: `ASN-${Date.now()}`,
-      studentId: studentAssignment.studentId.trim().toUpperCase(),
-      mentorId: studentAssignment.mentorId,
-      mentorName: mentor?.name || 'Unknown Mentor',
+      studentId: student.rollNumber,
+      studentName: student.name,
+      projectId: project.id,
+      projectName: project.name,
       assignedOn: new Date().toISOString().split('T')[0]
     };
 
     setAssignmentHistory((prev) => [assignment, ...prev]);
-    setStudentAssignment({ studentId: '', mentorId: '' });
+    setStudentAssignment({ studentId: '', projectId: '' });
     alert('Student assigned successfully.');
   };
 
@@ -79,20 +96,30 @@ function ProjectApprovalPanel({ proposals, mentors, activeAction }) {
           <>
             <h3>Assign Students</h3>
             <div className="approval-form">
-              <input
-                className="form-input"
-                placeholder="Student ID (e.g., STU001)"
-                value={studentAssignment.studentId}
-                onChange={(e) => setStudentAssignment({ ...studentAssignment, studentId: e.target.value })}
-              />
+              <div className="info-section" style={{ gridColumn: '1 / -1' }}>
+                <h4>Assign Student to Project</h4>
+                <p>Choose student first, then choose the project where you want to add the student.</p>
+              </div>
               <select
                 className="form-select"
-                value={studentAssignment.mentorId}
-                onChange={(e) => setStudentAssignment({ ...studentAssignment, mentorId: e.target.value })}
+                value={studentAssignment.studentId}
+                onChange={(e) => setStudentAssignment({ ...studentAssignment, studentId: e.target.value })}
               >
-                <option value="">Select Mentor</option>
-                {mentors.map((mentor) => (
-                  <option key={mentor.id} value={mentor.id}>{mentor.name}</option>
+                <option value="">Choose Student</option>
+                {availableStudents.map((student) => (
+                  <option key={student.rollNumber} value={student.rollNumber}>
+                    {student.rollNumber} - {student.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="form-select"
+                value={studentAssignment.projectId}
+                onChange={(e) => setStudentAssignment({ ...studentAssignment, projectId: e.target.value })}
+              >
+                <option value="">Choose Project</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.id} - {project.name}</option>
                 ))}
               </select>
               <button className="btn-primary" onClick={handleAssignStudent}>Assign Student</button>
@@ -105,8 +132,8 @@ function ProjectApprovalPanel({ proposals, mentors, activeAction }) {
               ) : (
                 assignmentHistory.map((entry) => (
                   <div key={entry.id} className="proposal-card approved">
-                    <p className="proposal-meta">Student: <strong>{entry.studentId}</strong></p>
-                    <p className="proposal-meta">Mentor: <strong>{entry.mentorName}</strong></p>
+                    <p className="proposal-meta">Student: <strong>{entry.studentId} - {entry.studentName}</strong></p>
+                    <p className="proposal-meta">Project: <strong>{entry.projectId} - {entry.projectName}</strong></p>
                     <p className="proposal-meta">Assigned On: {entry.assignedOn}</p>
                   </div>
                 ))

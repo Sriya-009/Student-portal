@@ -25,19 +25,7 @@ function FileReviewPanel({ files, projects, activeAction }) {
   const selectedAction = activeAction || 'files-overview';
   const showViewSubmissions = selectedAction === 'file-view' || selectedAction === 'files-overview';
   const showVerifyUploads = selectedAction === 'file-verify';
-  const showVersions = selectedAction === 'file-versions';
-  const showSubmissionStatus = selectedAction === 'submission-status';
   const showPendingSubmissions = selectedAction === 'submission-pending';
-
-  const latestByProject = Object.values(
-    filesState.reduce((acc, file) => {
-      const current = acc[file.projectId];
-      if (!current || file.version > current.version) {
-        acc[file.projectId] = file;
-      }
-      return acc;
-    }, {})
-  );
 
   return (
     <section className="faculty-panel">
@@ -102,61 +90,6 @@ function FileReviewPanel({ files, projects, activeAction }) {
                 ))
               )}
             </div>
-          </div>
-        )}
-
-        {showVersions && (
-          <div className="file-review-section">
-            <h4>Check Versions</h4>
-            <table>
-              <thead>
-                <tr>
-                  <th>Project</th>
-                  <th>File Name</th>
-                  <th>Current Version</th>
-                  <th>Uploaded Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {latestByProject.map((file) => (
-                  <tr key={file.projectId}>
-                    <td>{file.projectId}</td>
-                    <td>{file.fileName}</td>
-                    <td>v{file.version}</td>
-                    <td>{file.uploadedDate}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {showSubmissionStatus && (
-          <div className="file-review-section">
-            <h4>Submission Status</h4>
-            <table>
-              <thead>
-                <tr>
-                  <th>Project</th>
-                  <th>Submitted Files</th>
-                  <th>Pending Files</th>
-                </tr>
-              </thead>
-              <tbody>
-                {projects.map((project) => {
-                  const byProject = filesState.filter((file) => file.projectId === project.id);
-                  const projectSubmitted = byProject.filter((file) => file.isSubmitted).length;
-                  const projectPending = byProject.filter((file) => !file.isSubmitted).length;
-                  return (
-                    <tr key={project.id}>
-                      <td>{project.id}</td>
-                      <td>{projectSubmitted}</td>
-                      <td>{projectPending}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
           </div>
         )}
 

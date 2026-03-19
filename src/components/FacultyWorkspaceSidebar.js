@@ -7,7 +7,6 @@ const facultySections = [
     items: [
       { label: 'Review Proposals', actionId: 'approval-review' },
       { label: 'Pending Approvals', actionId: 'approval-pending' },
-      { label: 'Assign Mentors', actionId: 'approval-assign-mentor' },
       { label: 'Assign Students', actionId: 'approval-assign-students' },
       { label: 'Approval History', actionId: 'approval-history' }
     ]
@@ -40,8 +39,6 @@ const facultySections = [
     items: [
       { label: 'View Submissions', actionId: 'file-view' },
       { label: 'Verify Uploads', actionId: 'file-verify' },
-      { label: 'Check Versions', actionId: 'file-versions' },
-      { label: 'Submission Status', actionId: 'submission-status' },
       { label: 'Pending Submissions', actionId: 'submission-pending' }
     ]
   },

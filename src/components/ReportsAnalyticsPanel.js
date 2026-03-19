@@ -1,4 +1,10 @@
+import { useState } from 'react';
+
 function ReportsAnalyticsPanel({ projects, grades, activeAction }) {
+  const [generatedReport, setGeneratedReport] = useState('');
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [actionMessage, setActionMessage] = useState('');
+
   const handleGenerateReport = () => {
     const report = `
 COMPREHENSIVE PROJECT & GRADING REPORT
@@ -35,7 +41,9 @@ Deadline: ${p.deadline}
 
 === END OF REPORT ===
 `;
-    alert('Full report generated.\n\n' + report.substring(0, 300) + '...');
+  setGeneratedReport(report.trim());
+  setIsReportOpen(true);
+  setActionMessage('Full report generated.');
   };
 
   const handleExportCSV = () => {
@@ -57,11 +65,32 @@ Deadline: ${p.deadline}
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
-    alert('CSV report exported successfully.');
+    setActionMessage('CSV report exported successfully.');
   };
 
-  const handleEmailReport = () => {
-    alert('Report sent to admin@institution.edu\n\nIncluding:\n- Performance summary\n- Grade distribution\n- Project status overview');
+  const handleCopyReport = async () => {
+    if (!generatedReport) return;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(generatedReport);
+        setActionMessage('Report copied to clipboard.');
+        return;
+      }
+    } catch (error) {
+      // Continue with fallback copy method.
+    }
+
+    const textArea = document.createElement('textarea');
+    textArea.value = generatedReport;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    setActionMessage('Report copied to clipboard.');
   };
 
   const totalProjects = projects.length;
@@ -115,8 +144,8 @@ Deadline: ${p.deadline}
             <div className="button-group" style={{ marginBottom: '16px' }}>
               <button className="btn-success" onClick={handleGenerateReport}>Generate Full Report</button>
               <button className="btn-primary" onClick={handleExportCSV}>Export to CSV</button>
-              <button className="btn-secondary" onClick={handleEmailReport}>Email Report</button>
             </div>
+            {actionMessage ? <p className="report-action-message">{actionMessage}</p> : null}
           </>
         )}
 
@@ -194,7 +223,6 @@ Deadline: ${p.deadline}
             <h3>Export Data</h3>
             <div className="button-group">
               <button className="btn-primary" onClick={handleExportCSV}>Export to CSV</button>
-              <button className="btn-secondary" onClick={handleEmailReport}>Email Report</button>
             </div>
           </>
         )}
@@ -233,6 +261,30 @@ Deadline: ${p.deadline}
           </>
         )}
       </div>
+
+      {isReportOpen ? (
+        <div className="report-modal-overlay" onClick={() => setIsReportOpen(false)}>
+          <section
+            className="report-modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Full generated report"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="report-modal-head">
+              <h3>Comprehensive Project & Grading Report</h3>
+              <button type="button" className="report-modal-close" onClick={() => setIsReportOpen(false)}>✕</button>
+            </div>
+
+            <pre className="report-modal-content">{generatedReport}</pre>
+
+            <div className="report-modal-actions">
+              <button type="button" className="btn-secondary" onClick={handleCopyReport}>Copy Report</button>
+              <button type="button" className="btn-primary" onClick={() => setIsReportOpen(false)}>Close</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
