@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { bTechProjects, projectChats, projectTasks, projectFiles, projectProposals, projectGrades } from '../data/portalData';
+import { bTechProjects, projectChats, projectTasks, projectFiles, projectProposals, projectGrades } from '../../data/portalData';
 import TaskManagement from './TaskManagement';
 import FileManagement from './FileManagement';
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { getPendingNotifications, markEventAsNotified } from '../services/notificationService';
-import '../styles/notifications.css';
+import { getPendingNotifications, markEventAsNotified } from '../../services/notificationService';
+import '../../styles/notifications.css';
 
 function NotificationPanel({ events, studentId, phoneNumber, studentName }) {
   const [notifications, setNotifications] = useState([]);

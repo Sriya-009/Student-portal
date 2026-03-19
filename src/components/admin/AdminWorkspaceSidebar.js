@@ -66,7 +66,7 @@ const adminSections = [
   },
   {
     id: 'maintenance',
-    title: 'Maintenance',
+    title: 'System Maintenance & Support',
     items: [
       { label: 'Fix System Issues', actionId: 'maintenance-fix-issues' },
       { label: 'Update Features', actionId: 'maintenance-update-features' },
@@ -75,7 +75,7 @@ const adminSections = [
   },
   {
     id: 'final-actions',
-    title: 'Final Actions',
+    title: 'Project Closure & Archives',
     items: [
       { label: 'Archive Completed Projects', actionId: 'final-archive-projects' },
       { label: 'Maintain History Records', actionId: 'final-maintain-history' },

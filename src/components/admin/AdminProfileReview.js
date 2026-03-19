@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { profileUpdateRequests, students, mentors } from '../data/portalData';
-import '../styles/admin-profile-review.css';
+import { profileUpdateRequests, students, mentors } from '../../data/portalData';
+import '../../styles/admin-profile-review.css';
 
 function AdminProfileReview() {
   const [requests, setRequests] = useState(profileUpdateRequests);

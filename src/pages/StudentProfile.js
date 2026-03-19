@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { students, profileUpdateRequests } from '../data/portalData';
-import ThemeToggle from '../components/ThemeToggle';
+import ThemeToggle from '../components/shared/ThemeToggle';
 import '../styles/profile.css';
 
 function StudentProfile() {

@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import SubmissionCalendar from '../components/SubmissionCalendar';
-import ProjectManagement from '../components/ProjectManagement';
-import ThemeToggle from '../components/ThemeToggle';
-import ProjectWorkspaceSidebar from '../components/ProjectWorkspaceSidebar';
-import NotificationPanel from '../components/NotificationPanel';
+import SubmissionCalendar from '../components/shared/SubmissionCalendar';
+import ProjectManagement from '../components/student/ProjectManagement';
+import ThemeToggle from '../components/shared/ThemeToggle';
+import ProjectWorkspaceSidebar from '../components/student/ProjectWorkspaceSidebar';
+import NotificationPanel from '../components/student/NotificationPanel';
 import { students, submissionEvents } from '../data/portalData';
 import '../styles/dashboard.css';
 

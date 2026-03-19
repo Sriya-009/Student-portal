@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import PrivateRoute from './components/PrivateRoute';
+import PrivateRoute from './components/shared/PrivateRoute';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AdminDashboard from './pages/AdminDashboard';

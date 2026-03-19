@@ -1,5 +1,5 @@
-import Navbar from '../components/Navbar';
-import Card from '../components/Card';
+import Navbar from '../components/shared/Navbar';
+import Card from '../components/shared/Card';
 import '../styles/dashboard.css';
 
 function UploadFiles() {

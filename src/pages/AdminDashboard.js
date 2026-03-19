@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import AdminControlCenter from '../components/AdminControlCenter';
-import AdminWorkspaceSidebar from '../components/AdminWorkspaceSidebar';
+import AdminControlCenter from '../components/admin/AdminControlCenter';
+import AdminWorkspaceSidebar from '../components/admin/AdminWorkspaceSidebar';
 import { useAuth } from '../context/AuthContext';
-import { students, mentors, bTechProjects, projectProposals, projectFiles, submissionEvents } from '../data/portalData';
+import { students, mentors, bTechProjects, projectFiles, submissionEvents } from '../data/portalData';
 import '../styles/dashboard.css';
 
 function AdminDashboard() {
@@ -24,7 +24,7 @@ function AdminDashboard() {
           <span className="icon-badge">⚙</span>
           <div>
             <p className="topbar-name">Admin Dashboard</p>
-            <p className="topbar-meta">Website control and submission date extension</p>
+            <p className="topbar-meta">Centralized control for users, operations, and records</p>
           </div>
         </div>
         <button type="button" className="outline-btn" onClick={handleLogout}>Logout</button>
@@ -62,7 +62,6 @@ function AdminDashboard() {
             students={students}
             mentors={mentors}
             projects={bTechProjects}
-            projectProposals={projectProposals}
             files={projectFiles}
             submissionEvents={submissionEvents}
             activeSection={activeSection}
