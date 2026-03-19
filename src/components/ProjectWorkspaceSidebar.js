@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 const sections = [
   {
     id: 'my-projects',
@@ -70,6 +72,18 @@ const sections = [
 ];
 
 function ProjectWorkspaceSidebar({ onSectionSelect, onActionSelect }) {
+  const [openSections, setOpenSections] = useState({
+    'my-projects': true,
+    'task-management': true
+  });
+
+  const toggleSection = (id) => {
+    setOpenSections((prev) => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
   return (
     <section className="workspace-sidebar" aria-label="Project Workspace Navigation">
       <div className="workspace-sidebar-head">
@@ -78,35 +92,40 @@ function ProjectWorkspaceSidebar({ onSectionSelect, onActionSelect }) {
 
       <div className="workspace-menu">
         {sections.map((section) => {
+          const isOpen = Boolean(openSections[section.id]);
           return (
             <article key={section.id} className="workspace-menu-section">
               <button
                 type="button"
                 className="workspace-menu-title"
                 onClick={() => {
+                  toggleSection(section.id);
                   onSectionSelect?.(section.id);
                 }}
               >
                 <span>{section.title}</span>
+                <span className="workspace-chevron">{isOpen ? '▾' : '▸'}</span>
               </button>
 
               {section.subtitle ? (
                 <p className="workspace-subtitle">{section.subtitle}</p>
               ) : null}
 
-              <ul className="workspace-submenu">
-                {section.items.map((item) => (
-                  <li key={item.action}>
-                    <button
-                      type="button"
-                      className="workspace-submenu-action"
-                      onClick={() => onActionSelect?.(item.action)}
-                    >
-                      {item.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {isOpen ? (
+                <ul className="workspace-submenu">
+                  {section.items.map((item) => (
+                    <li key={item.action}>
+                      <button
+                        type="button"
+                        className="workspace-submenu-action"
+                        onClick={() => onActionSelect?.(item.action)}
+                      >
+                        » {item.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </article>
           );
         })}

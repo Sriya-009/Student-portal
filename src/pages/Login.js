@@ -99,9 +99,11 @@ function Login() {
               placeholder="6-digit OTP"
               value={otpCode}
               onChange={(event) => setOtpCode(event.target.value)}
+              maxLength={6}
+              inputMode="numeric"
               required
             />
-            <p className="auth-subtext">For demo: OTP is {otpSession.demoOtp}</p>
+            <p className="otp-demo">For demo: OTP is {otpSession.demoOtp}</p>
           </>
         ) : (
           <>
@@ -128,19 +130,18 @@ function Login() {
         )}
 
         {error ? <p className="error">{error}</p> : null}
+
+        {resendSuccess ? <p className="success-message">OTP resent successfully.</p> : null}
+
         <button type="submit" className="btn auth-submit">
           {otpSession ? 'Verify OTP' : 'Sign In'}
         </button>
 
         {otpSession ? (
-          <button type="button" className="btn secondary-btn" onClick={resetOtpStep}>
-            Use Different Credentials
-          </button>
-        ) : null}
-
-        {otpSession ? (
-          <div className="resend-otp-section">
-            {resendSuccess && <p className="success-message">✓ OTP resent successfully!</p>}
+          <div className="otp-actions">
+            <button type="button" className="btn secondary-btn" onClick={resetOtpStep}>
+              Use Different Credentials
+            </button>
             <button
               type="button"
               className="btn secondary-btn resend-btn"

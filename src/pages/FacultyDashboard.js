@@ -15,21 +15,6 @@ import FinalActionsPanel from '../components/FinalActionsPanel';
 import { mentors, projectProposals, bTechProjects, projectGrades, projectTasks, projectFiles } from '../data/portalData';
 import '../styles/dashboard.css';
 
-const facultyQuickActions = [
-  'Approve project proposals',
-  'Monitor progress and tasks',
-  'Review submissions and files',
-  'Provide feedback and assign grades',
-  'Generate reports and finalize projects'
-];
-
-const adminHandledActions = [
-  'User accounts and role permissions',
-  'System security and access control',
-  'Database operations and backups',
-  'Platform-level announcements and operations'
-];
-
 function FacultyDashboard() {
   const [activeView, setActiveView] = useState('approval');
   const { user, logout } = useAuth();
@@ -132,25 +117,6 @@ function FacultyDashboard() {
           <section className="page-head">
             <h1>{getPageTitle(activeView)}</h1>
             <p>{getPageDescription(activeView)}</p>
-          </section>
-
-          <section className="role-summary-card simplified-card">
-            <div>
-              <h2>Faculty Workspace (Simplified)</h2>
-              <ul className="simple-list">
-                {facultyQuickActions.map((action) => (
-                  <li key={action}>{action}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h2>Handled by Admin</h2>
-              <ul className="simple-list muted">
-                {adminHandledActions.map((action) => (
-                  <li key={action}>{action}</li>
-                ))}
-              </ul>
-            </div>
           </section>
 
           {renderActiveView()}
