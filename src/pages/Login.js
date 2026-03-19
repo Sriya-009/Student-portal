@@ -20,7 +20,7 @@ function Login() {
       const userRole = loggedInUser.role;
 
       if (userRole === 'admin') navigate('/admin');
-      else if (userRole === 'teacher') navigate('/teacher');
+      else if (userRole === 'faculty') navigate('/faculty');
       else navigate('/student');
     } catch (loginError) {
       setError(loginError.message);
@@ -54,6 +54,18 @@ function Login() {
           </button>
           <button
             type="button"
+            className={role === 'faculty' ? 'active' : ''}
+            onClick={() => {
+              setRole('faculty');
+              setIdentifier('');
+              setPassword('');
+              setError('');
+            }}
+          >
+            Faculty
+          </button>
+          <button
+            type="button"
             className={role === 'admin' ? 'active' : ''}
             onClick={() => {
               setRole('admin');
@@ -66,11 +78,11 @@ function Login() {
           </button>
         </div>
 
-        <label htmlFor="identifier">{role === 'student' ? 'Roll Number' : 'Admin ID'}</label>
+        <label htmlFor="identifier">{role === 'student' ? 'Roll Number' : 'Email or ID'}</label>
         <input
           id="identifier"
           type="text"
-          placeholder={role === 'student' ? 'Enter your roll number' : 'Enter admin id'}
+          placeholder={role === 'student' ? 'Enter your roll number' : 'Enter your login id'}
           value={identifier}
           onChange={(event) => setIdentifier(event.target.value)}
           required
@@ -88,13 +100,15 @@ function Login() {
 
         {error ? <p className="error">{error}</p> : null}
         <button type="submit" className="btn auth-submit">
-          {role === 'student' ? 'Sign In as Student' : 'Sign In as Admin'}
+          {role === 'student' ? 'Sign In as Student' : role === 'faculty' ? 'Sign In as Faculty' : 'Sign In as Admin'}
         </button>
 
         <div className="demo-box">
           <p>Demo Credentials:</p>
           {role === 'student' ? (
             <p><strong>Roll Number:</strong> STU001, STU002, STU003, or STU004<br /><strong>Password:</strong> student123</p>
+          ) : role === 'faculty' ? (
+            <p><strong>Faculty Email:</strong> faculty@school.com<br /><strong>Password:</strong> faculty123</p>
           ) : (
             <p><strong>Admin ID:</strong> admin<br /><strong>Password:</strong> admin123</p>
           )}

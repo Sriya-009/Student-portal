@@ -19,7 +19,7 @@ function Signup() {
     try {
       signup(name, email, password, role);
       if (role === 'admin') navigate('/admin');
-      else if (role === 'teacher') navigate('/teacher');
+      else if (role === 'faculty') navigate('/faculty');
       else navigate('/student');
     } catch (signupError) {
       setError(signupError.message);
@@ -53,7 +53,7 @@ function Signup() {
         />
         <select value={role} onChange={(event) => setRole(event.target.value)}>
           <option value="student">Student</option>
-          <option value="teacher">Teacher</option>
+          <option value="faculty">Faculty</option>
           <option value="admin">Admin</option>
         </select>
         {error ? <p className="error">{error}</p> : null}

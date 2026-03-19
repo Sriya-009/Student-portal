@@ -2,7 +2,7 @@ import { studentCredentials, students } from '../data/portalData';
 
 const users = [
   { id: 1, name: 'Admin User', email: 'admin', password: 'admin123', role: 'admin' },
-  { id: 2, name: 'Teacher User', email: 'teacher@school.com', password: 'teacher123', role: 'teacher' }
+  { id: 2, name: 'Faculty User', email: 'faculty@school.com', password: 'faculty123', role: 'faculty' }
 ];
 
 export function loginUser(identifier, password, role = 'student') {
@@ -33,7 +33,7 @@ export function loginUser(identifier, password, role = 'student') {
   );
 
   if (!user) {
-    throw new Error('Invalid admin credentials');
+    throw new Error(`Invalid ${role} credentials`);
   }
 
   return {
