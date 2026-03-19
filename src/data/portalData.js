@@ -33,92 +33,177 @@ export const students = [
   }
 ];
 
-export const achievements = [
+export const bTechProjects = [
   {
-    id: 'ACH-001',
-    studentRoll: 'STU001',
-    title: 'First Place - State Science Fair',
-    description: 'Won first place in the State Science Fair with a project on renewable energy solutions.',
-    category: 'Academic Competition',
-    level: 'State',
-    date: '2025-11-15',
-    position: '1st Place',
-    type: 'achievement',
-    participationHours: 20
+    id: 'BTECH-PRJ-001',
+    name: 'AI-Based Attendance System',
+    description: 'Face recognition attendance system using OpenCV and ML.',
+    ownerId: 'STU001',
+    projectLeadId: 'STU001',
+    mentorId: null,
+    teamMemberIds: ['STU001', 'STU002'],
+    teamMembers: [
+      { id: 'STU001', name: 'Emma Johnson', role: 'Lead Developer' },
+      { id: 'STU002', name: 'Liam Chen', role: 'ML Engineer' }
+    ],
+    status: 'ongoing',
+    progressPercent: 65,
+    createdDate: '2026-01-15',
+    deadline: '2026-05-30',
+    technologies: ['Python', 'OpenCV', 'TensorFlow']
   },
   {
-    id: 'ACH-002',
-    studentRoll: 'STU001',
-    title: 'Best Painter Award',
-    description: 'Received Best Painter Award at the Annual Art Exhibition.',
-    category: 'Arts',
-    level: 'School',
-    date: '2025-09-20',
-    position: 'Winner',
-    type: 'achievement',
-    participationHours: 10
+    id: 'BTECH-PRJ-002',
+    name: 'Smart Home Automation',
+    description: 'IoT-based home automation system with mobile app control.',
+    ownerId: 'STU002',
+    projectLeadId: 'STU002',
+    mentorId: null,
+    teamMemberIds: ['STU002', 'STU003'],
+    teamMembers: [
+      { id: 'STU002', name: 'Liam Chen', role: 'Lead Developer' },
+      { id: 'STU003', name: 'Sophia Martinez', role: 'Frontend Developer' }
+    ],
+    status: 'ongoing',
+    progressPercent: 45,
+    createdDate: '2026-02-01',
+    deadline: '2026-06-15',
+    technologies: ['IoT', 'Arduino', 'React']
   },
   {
-    id: 'ACH-003',
-    studentRoll: 'STU002',
-    title: 'National Basketball Championship',
-    description: 'Team Captain - Led school basketball team to national finals victory.',
-    category: 'Sports',
-    level: 'National',
-    date: '2025-12-10',
-    position: 'Champion',
-    type: 'activity',
-    participationHours: 280
+    id: 'BTECH-PRJ-003',
+    name: 'E-Learning Platform',
+    description: 'Web-based e-learning platform with video streaming and quizzes.',
+    ownerId: 'STU003',
+    projectLeadId: 'STU003',
+    mentorId: null,
+    teamMemberIds: ['STU003', 'STU004', 'STU001'],
+    teamMembers: [
+      { id: 'STU003', name: 'Sophia Martinez', role: 'Project Manager' },
+      { id: 'STU004', name: 'Noah Patel', role: 'Backend Developer' },
+      { id: 'STU001', name: 'Emma Johnson', role: 'Database Architect' }
+    ],
+    status: 'ongoing',
+    progressPercent: 30,
+    createdDate: '2026-02-15',
+    deadline: '2026-07-30',
+    technologies: ['Node.js', 'React', 'MongoDB']
   },
   {
-    id: 'ACH-004',
-    studentRoll: 'STU002',
-    title: 'Student Council President',
-    description: 'Elected as Student Council President for the academic year.',
-    category: 'Leadership',
-    level: 'School',
-    date: '2025-08-01',
-    position: '-',
-    type: 'activity',
-    participationHours: 180
-  },
-  {
-    id: 'ACH-005',
-    studentRoll: 'STU003',
-    title: 'International Music Competition',
-    description: 'Silver medalist in Piano Performance at International Youth Music Fest.',
-    category: 'Music',
-    level: 'International',
-    date: '2025-10-05',
-    position: '2nd Place',
-    type: 'achievement',
-    participationHours: 210
-  },
-  {
-    id: 'ACH-006',
-    studentRoll: 'STU003',
-    title: 'Community Service Award',
-    description: 'Recognized for 200+ hours of community service and mentoring.',
-    category: 'Community Service',
-    level: 'District',
-    date: '2025-12-20',
-    position: '-',
-    type: 'activity',
-    participationHours: 200
-  },
-  {
-    id: 'ACH-007',
-    studentRoll: 'STU004',
-    title: 'Drama Club - Best Actor',
-    description: 'Best Actor award for leading role in school production.',
-    category: 'Drama',
-    level: 'School',
-    date: '2026-01-15',
-    position: 'Winner',
-    type: 'achievement',
-    participationHours: 105
+    id: 'BTECH-PRJ-004',
+    name: 'Weather Prediction App',
+    description: 'Machine learning model for weather forecasting with mobile app.',
+    ownerId: 'STU004',
+    projectLeadId: 'STU004',
+    mentorId: null,
+    teamMemberIds: ['STU004'],
+    teamMembers: [
+      { id: 'STU004', name: 'Noah Patel', role: 'Solo Developer' }
+    ],
+    status: 'ongoing',
+    progressPercent: 20,
+    createdDate: '2026-03-01',
+    deadline: '2026-08-15',
+    technologies: ['Python', 'Scikit-learn', 'Flutter']
   }
 ];
+
+export const projectChats = [
+  {
+    id: 'CHAT-PRJ-001-MSG-001',
+    projectId: 'BTECH-PRJ-001',
+    senderId: 'STU001',
+    senderName: 'Emma Johnson',
+    message: 'Dataset preprocessed. Ready for training phase.',
+    timestamp: '2026-03-19T10:30:00Z'
+  },
+  {
+    id: 'CHAT-PRJ-001-MSG-002',
+    projectId: 'BTECH-PRJ-001',
+    senderId: 'STU002',
+    senderName: 'Liam Chen',
+    message: 'Great! I am setting up the model architecture.',
+    timestamp: '2026-03-19T10:35:00Z'
+  },
+  {
+    id: 'CHAT-PRJ-002-MSG-001',
+    projectId: 'BTECH-PRJ-002',
+    senderId: 'STU002',
+    senderName: 'Liam Chen',
+    message: 'Mobile app UI screens completed',
+    timestamp: '2026-03-18T15:20:00Z'
+  }
+];
+
+export const projectTasks = [
+  {
+    id: 'TSK-001',
+    projectId: 'BTECH-PRJ-001',
+    title: 'Dataset Collection & Preprocessing',
+    description: 'Collect facial images and preprocess them for model training',
+    assignedToId: 'STU001',
+    assignedToName: 'Emma Johnson',
+    createdByLeadId: 'STU001',
+    deadline: '2026-04-15',
+    status: 'in_progress',
+    contributionPercent: 40,
+    createdDate: '2026-03-15'
+  },
+  {
+    id: 'TSK-002',
+    projectId: 'BTECH-PRJ-001',
+    title: 'Model Training & Optimization',
+    description: 'Train ML model using TensorFlow and optimize accuracy',
+    assignedToId: 'STU002',
+    assignedToName: 'Liam Chen',
+    createdByLeadId: 'STU001',
+    deadline: '2026-04-30',
+    status: 'pending',
+    contributionPercent: 0,
+    createdDate: '2026-03-15'
+  },
+  {
+    id: 'TSK-003',
+    projectId: 'BTECH-PRJ-001',
+    title: 'API Integration',
+    description: 'Create REST API for attendance marking',
+    assignedToId: 'STU001',
+    assignedToName: 'Emma Johnson',
+    createdByLeadId: 'STU001',
+    deadline: '2026-05-15',
+    status: 'pending',
+    contributionPercent: 0,
+    createdDate: '2026-03-18'
+  },
+  {
+    id: 'TSK-004',
+    projectId: 'BTECH-PRJ-002',
+    title: 'Hardware Setup & Configuration',
+    description: 'Set up Arduino and IoT devices for home automation',
+    assignedToId: 'STU002',
+    assignedToName: 'Liam Chen',
+    createdByLeadId: 'STU002',
+    deadline: '2026-04-20',
+    status: 'in_progress',
+    contributionPercent: 30,
+    createdDate: '2026-03-10'
+  },
+  {
+    id: 'TSK-005',
+    projectId: 'BTECH-PRJ-002',
+    title: 'Mobile App UI/UX Design',
+    description: 'Design user-friendly interface for mobile control app',
+    assignedToId: 'STU003',
+    assignedToName: 'Sophia Martinez',
+    createdByLeadId: 'STU002',
+    deadline: '2026-04-25',
+    status: 'in_progress',
+    contributionPercent: 50,
+    createdDate: '2026-03-10'
+  }
+];
+
+export const achievements = [];
 
 export const studentCredentials = [
   { rollNumber: 'STU001', password: 'student123' },
