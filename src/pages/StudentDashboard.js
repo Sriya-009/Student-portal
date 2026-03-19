@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { achievements, students } from '../data/portalData';
+import SubmissionCalendar from '../components/SubmissionCalendar';
+import { achievements, students, submissionEvents } from '../data/portalData';
 import '../styles/dashboard.css';
 
 function StudentDashboard() {
@@ -66,6 +67,13 @@ function StudentDashboard() {
           >
             Showcase
           </button>
+          <button
+            type="button"
+            className={`sidebar-action ${activeView === 'calendar' ? 'active' : ''}`}
+            onClick={() => setActiveView('calendar')}
+          >
+            Submission Calendar
+          </button>
         </aside>
 
         <main className="portal-main">
@@ -123,7 +131,7 @@ function StudentDashboard() {
                 ))}
               </section>
             </>
-          ) : (
+          ) : activeView === 'showcase' ? (
             <>
               <section className="showcase-hero">
                 <div className="showcase-avatar">{currentStudent.initials}</div>
@@ -167,6 +175,15 @@ function StudentDashboard() {
                   ))}
                 </ul>
               </section>
+            </>
+          ) : (
+            <>
+              <section className="page-head">
+                <h1>Event Submission Calendar</h1>
+                <p>Track due dates, quizzes, and assignment uploads in one monthly view</p>
+              </section>
+
+              <SubmissionCalendar events={submissionEvents} />
             </>
           )}
         </main>

@@ -126,3 +126,104 @@ export const studentCredentials = [
   { rollNumber: 'STU003', password: 'student123' },
   { rollNumber: 'STU004', password: 'student123' }
 ];
+
+export const submissionEvents = [
+  {
+    id: 'SUB-001',
+    title: 'ALM-6 on CO-3 is due',
+    date: '2026-03-06',
+    course: 'All courses',
+    type: 'deadline'
+  },
+  {
+    id: 'SUB-002',
+    title: 'Quiz 1 opens',
+    date: '2026-03-07',
+    course: 'CO3',
+    type: 'quiz'
+  },
+  {
+    id: 'SUB-003',
+    title: 'Quiz 2 opens',
+    date: '2026-03-07',
+    course: 'CO3',
+    type: 'quiz'
+  },
+  {
+    id: 'SUB-004',
+    title: 'Skill in Sem Exam - Round 1',
+    date: '2026-03-12',
+    course: 'Skill Lab',
+    type: 'exam'
+  },
+  {
+    id: 'SUB-005',
+    title: 'Home Assignment Submission',
+    date: '2026-03-14',
+    course: 'Dynamic Programming',
+    type: 'assignment'
+  },
+  {
+    id: 'SUB-006',
+    title: 'ALMs is due',
+    date: '2026-03-15',
+    course: 'All courses',
+    type: 'deadline'
+  },
+  {
+    id: 'SUB-007',
+    title: 'Quiz 1 closes',
+    date: '2026-03-15',
+    course: 'CO3',
+    type: 'quiz'
+  },
+  {
+    id: 'SUB-008',
+    title: 'CO3 Quiz closes',
+    date: '2026-03-15',
+    course: 'CO3',
+    type: 'quiz'
+  },
+  {
+    id: 'SUB-009',
+    title: 'Skill Experiment 0 submission',
+    date: '2026-03-22',
+    course: 'Skill Lab',
+    type: 'assignment'
+  },
+  {
+    id: 'SUB-010',
+    title: 'Skill Experiment 1 submission',
+    date: '2026-03-22',
+    course: 'Skill Lab',
+    type: 'assignment'
+  },
+  {
+    id: 'SUB-011',
+    title: 'CO3 Home Assignment',
+    date: '2026-03-25',
+    course: 'CO3',
+    type: 'assignment'
+  },
+  {
+    id: 'SUB-012',
+    title: 'ALMs is due',
+    date: '2026-03-29',
+    course: 'All courses',
+    type: 'deadline'
+  },
+  {
+    id: 'SUB-013',
+    title: 'Home Assignment upload',
+    date: '2026-03-30',
+    course: 'All courses',
+    type: 'assignment'
+  },
+  {
+    id: 'SUB-014',
+    title: 'Dynamic Programming HA-3 due',
+    date: '2026-03-31',
+    course: 'Dynamic Programming',
+    type: 'assignment'
+  }
+];
