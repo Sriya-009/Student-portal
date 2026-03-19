@@ -1216,6 +1216,22 @@ body.dark-mode .pill.badge {
   line-height: 1.35;
 }
 
+.workspace-submenu-action {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+  padding: 0;
+  cursor: pointer;
+}
+
+.workspace-submenu-action:hover {
+  color: #3b82f6;
+}
+
 .project-list {
   background: var(--bg-secondary);
   border: 1px solid var(--card-border);

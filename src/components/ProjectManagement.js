@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { bTechProjects, projectChats, projectTasks, projectFiles } from '../data/portalData';
 import TaskManagement from './TaskManagement';
 import FileManagement from './FileManagement';
 import ProjectFilter from './ProjectFilter';
 
-function ProjectManagement({ studentId }) {
+function ProjectManagement({ studentId, workspaceAction }) {
   const [projects, setProjects] = useState(bTechProjects);
   const [selectedProject, setSelectedProject] = useState(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -100,6 +100,80 @@ function ProjectManagement({ studentId }) {
     setProjectMessages([...projectMessages, message]);
     setNewMessage('');
   };
+
+  useEffect(() => {
+    if (!workspaceAction?.id) {
+      return;
+    }
+
+    const allStudentProjects = projects.filter((p) => p.teamMemberIds.includes(studentId));
+    const firstProject = allStudentProjects[0];
+    const leadProject = allStudentProjects.find((p) => p.projectLeadId === studentId) || firstProject;
+
+    const openProjectView = (project, tab) => {
+      if (!project) {
+        return;
+      }
+      setSelectedProject(project.id);
+      setActiveTab(tab);
+    };
+
+    switch (workspaceAction.id) {
+      case 'create-project':
+        setProjectFilter('all');
+        setShowCreateForm(true);
+        break;
+      case 'view-assigned':
+        setProjectFilter('all');
+        break;
+      case 'view-details':
+        setProjectFilter('all');
+        openProjectView(firstProject, 'overview');
+        break;
+      case 'filter-ongoing':
+        setProjectFilter('ongoing');
+        break;
+      case 'filter-completed':
+        setProjectFilter('completed');
+        break;
+      case 'team-add-join':
+      case 'team-communicate':
+        openProjectView(firstProject, 'chat');
+        break;
+      case 'team-coordinate-faculty':
+        alert('Use Submission Calendar to coordinate deadlines and faculty updates.');
+        break;
+      case 'task-create':
+      case 'task-assign':
+      case 'task-view':
+      case 'task-update':
+      case 'task-track':
+        if (leadProject?.projectLeadId !== studentId) {
+          alert('Task management is available only for project leads assigned by faculty.');
+          break;
+        }
+        openProjectView(leadProject, 'tasks');
+        break;
+      case 'file-upload':
+      case 'file-update':
+      case 'file-view':
+        openProjectView(leadProject, 'files');
+        break;
+      case 'feedback-view':
+      case 'feedback-check':
+      case 'feedback-corrections':
+        openProjectView(firstProject, 'overview');
+        alert('Feedback and evaluation panel can be added next.');
+        break;
+      case 'docs-maintain':
+      case 'docs-prepare':
+      case 'docs-organize':
+        openProjectView(leadProject, 'files');
+        break;
+      default:
+        break;
+    }
+  }, [workspaceAction, projects, studentId]);
 
   return (
     <div className="project-management">

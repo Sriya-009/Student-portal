@@ -10,6 +10,7 @@ import '../styles/dashboard.css';
 
 function StudentDashboard() {
   const [activeView, setActiveView] = useState('projects');
+  const [workspaceAction, setWorkspaceAction] = useState(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -53,12 +54,23 @@ function StudentDashboard() {
                 setActiveView('calendar');
               }
             }}
+            onActionSelect={(actionId) => {
+              if (actionId.startsWith('submit-')) {
+                setActiveView('calendar');
+              } else {
+                setActiveView('projects');
+              }
+              setWorkspaceAction({ id: actionId, timestamp: Date.now() });
+            }}
           />
         </aside>
 
         <main className="portal-main">
           {activeView === 'projects' ? (
-            <ProjectManagement studentId={currentStudent.rollNumber} />
+            <ProjectManagement
+              studentId={currentStudent.rollNumber}
+              workspaceAction={workspaceAction}
+            />
           ) : (
             <>
               <section className="page-head">
