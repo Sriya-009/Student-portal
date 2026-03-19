@@ -1218,6 +1218,10 @@ body.dark-mode .pill.badge {
   overflow: hidden;
 }
 
+.portal-sidebar .workspace-sidebar {
+  min-height: 100%;
+}
+
 .workspace-sidebar-head {
   padding: 12px 14px;
   border-bottom: 1px solid var(--card-border);
@@ -3119,7 +3123,10 @@ body.dark-mode .pill.badge {
 
 /* Faculty Sidebar */
 .faculty-sidebar {
-  max-height: calc(100vh - 60px);
+  min-height: calc(100vh - 90px);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
 }
 
@@ -3137,6 +3144,28 @@ body.dark-mode .pill.badge {
   padding: 12px 16px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.faculty-sidebar .workspace-submenu {
+  padding: 0 16px 12px 16px;
+}
+
+.faculty-sidebar .workspace-submenu-action {
+  padding: 2px 0;
+  font-size: 13px;
+}
+
+.faculty-sidebar .workspace-footer {
+  margin-top: auto;
+  padding: 12px 16px;
+  border-top: 1px solid var(--card-border);
+  background: var(--bg-primary);
+}
+
+.faculty-sidebar .workspace-info {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 /* Page Head */

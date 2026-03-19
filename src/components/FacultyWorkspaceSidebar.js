@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 const facultySections = [
   {
     id: 'approval',
@@ -103,20 +101,7 @@ const facultySections = [
 ];
 
 function FacultyWorkspaceSidebar({ onSectionSelect, onActionSelect }) {
-  const [openSections, setOpenSections] = useState(new Set(['approval', 'monitoring']));
-
-  const toggleSection = (sectionId) => {
-    const newOpen = new Set(openSections);
-    if (newOpen.has(sectionId)) {
-      newOpen.delete(sectionId);
-    } else {
-      newOpen.add(sectionId);
-    }
-    setOpenSections(newOpen);
-  };
-
   const handleSectionClick = (sectionId) => {
-    toggleSection(sectionId);
     onSectionSelect(sectionId);
   };
 
@@ -130,29 +115,22 @@ function FacultyWorkspaceSidebar({ onSectionSelect, onActionSelect }) {
 
       {facultySections.map((section) => (
         <div key={section.id} className="workspace-section">
-          <button
-            className="workspace-menu-title"
-            onClick={() => handleSectionClick(section.id)}
-            aria-expanded={openSections.has(section.id)}
-          >
+          <button className="workspace-menu-title" onClick={() => handleSectionClick(section.id)}>
             {section.title}
-            <span className="expand-icon">{openSections.has(section.id) ? '▼' : '▶'}</span>
           </button>
 
-          {openSections.has(section.id) && (
-            <div className="workspace-submenu">
-              {section.items.map((item) => (
-                <button
-                  key={item.actionId}
-                  className="workspace-submenu-action"
-                  onClick={() => handleActionClick(item.actionId)}
-                  title={item.label}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="workspace-submenu">
+            {section.items.map((item) => (
+              <button
+                key={item.actionId}
+                className="workspace-submenu-action"
+                onClick={() => handleActionClick(item.actionId)}
+                title={item.label}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
       ))}
 
