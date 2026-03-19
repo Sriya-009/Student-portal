@@ -22,6 +22,7 @@ function ProjectManagement({ studentId, workspaceAction }) {
   const [editProject, setEditProject] = useState(null);
   const [projectMessages, setProjectMessages] = useState(projectChats);
   const [newMessage, setNewMessage] = useState('');
+  const [workspaceNotice, setWorkspaceNotice] = useState('');
 
   const studentProjects = useMemo(
     () => {
@@ -112,6 +113,7 @@ function ProjectManagement({ studentId, workspaceAction }) {
 
     const openProjectView = (project, tab) => {
       if (!project) {
+        setWorkspaceNotice('No project found yet. Create your first project to continue.');
         return;
       }
       setSelectedProject(project.id);
@@ -122,58 +124,73 @@ function ProjectManagement({ studentId, workspaceAction }) {
       case 'create-project':
         setProjectFilter('all');
         setShowCreateForm(true);
+        setWorkspaceNotice('Create a new project using the form.');
         break;
       case 'view-assigned':
         setProjectFilter('all');
+        setWorkspaceNotice('Showing all assigned projects.');
         break;
       case 'view-details':
         setProjectFilter('all');
         openProjectView(firstProject, 'overview');
+        setWorkspaceNotice('Showing project details.');
         break;
       case 'filter-ongoing':
         setProjectFilter('ongoing');
+        setWorkspaceNotice('Filtered to ongoing projects.');
         break;
       case 'filter-completed':
         setProjectFilter('completed');
+        setWorkspaceNotice('Filtered to completed projects.');
         break;
       case 'team-add-join':
       case 'team-communicate':
         openProjectView(firstProject, 'chat');
+        setWorkspaceNotice('Team collaboration opened in project chat.');
         break;
       case 'team-coordinate-faculty':
-        alert('Use Submission Calendar to coordinate deadlines and faculty updates.');
+        setWorkspaceNotice('Use Submission section to coordinate with faculty deadlines.');
         break;
       case 'task-create':
       case 'task-assign':
       case 'task-view':
       case 'task-update':
       case 'task-track':
-        if (leadProject?.projectLeadId !== studentId) {
-          alert('Task management is available only for project leads assigned by faculty.');
-          break;
-        }
         openProjectView(leadProject, 'tasks');
+        if (leadProject?.projectLeadId !== studentId) {
+          setWorkspaceNotice('Task management is read-only for members. Only project leads can manage tasks.');
+        } else {
+          setWorkspaceNotice('Task management opened.');
+        }
         break;
       case 'file-upload':
       case 'file-update':
       case 'file-view':
         openProjectView(leadProject, 'files');
+        setWorkspaceNotice('File and submission management opened.');
         break;
       case 'feedback-view':
       case 'feedback-check':
       case 'feedback-corrections':
         openProjectView(firstProject, 'overview');
-        alert('Feedback and evaluation panel can be added next.');
+        setWorkspaceNotice('Feedback and evaluation area points to project overview for now.');
         break;
       case 'docs-maintain':
       case 'docs-prepare':
       case 'docs-organize':
         openProjectView(leadProject, 'files');
+        setWorkspaceNotice('Documentation actions are available in Files.');
         break;
       default:
         break;
     }
   }, [workspaceAction, projects, studentId]);
+
+  useEffect(() => {
+    if (!selectedProject && studentProjects.length > 0) {
+      setSelectedProject(studentProjects[0].id);
+    }
+  }, [selectedProject, studentProjects]);
 
   return (
     <div className="project-management">
@@ -204,7 +221,10 @@ function ProjectManagement({ studentId, workspaceAction }) {
                 <article
                   key={project.id}
                   className={`project-card ${selectedProject === project.id ? 'active' : ''}`}
-                  onClick={() => setSelectedProject(project.id)}
+                  onClick={() => {
+                    setSelectedProject(project.id);
+                    setActiveTab('overview');
+                  }}
                 >
                   <div className="project-card-head">
                     <h4>{project.name}</h4>
@@ -243,38 +263,40 @@ function ProjectManagement({ studentId, workspaceAction }) {
               </button>
             </div>
 
-            {selectedProjectData.projectLeadId === studentId && (
-              <div className="project-tabs">
-                <button
-                  type="button"
-                  className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('overview')}
-                >
-                  Overview
-                </button>
-                <button
-                  type="button"
-                  className={`tab-btn ${activeTab === 'tasks' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('tasks')}
-                >
-                  Tasks
-                </button>
-                <button
-                  type="button"
-                  className={`tab-btn ${activeTab === 'files' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('files')}
-                >
-                  Files
-                </button>
-                <button
-                  type="button"
-                  className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
-                  onClick={() => setActiveTab('chat')}
-                >
-                  Chat
-                </button>
-              </div>
-            )}
+            <div className="project-tabs">
+              <button
+                type="button"
+                className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+                onClick={() => setActiveTab('overview')}
+              >
+                Overview
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${activeTab === 'tasks' ? 'active' : ''}`}
+                onClick={() => setActiveTab('tasks')}
+              >
+                Tasks
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${activeTab === 'files' ? 'active' : ''}`}
+                onClick={() => setActiveTab('files')}
+              >
+                Files
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
+                onClick={() => setActiveTab('chat')}
+              >
+                Chat
+              </button>
+            </div>
+
+            {workspaceNotice ? (
+              <p className="workspace-notice">{workspaceNotice}</p>
+            ) : null}
 
             <div className="project-details-info">
               {activeTab === 'overview' && (
@@ -323,7 +345,7 @@ function ProjectManagement({ studentId, workspaceAction }) {
                 </>
               )}
 
-              {activeTab === 'tasks' && selectedProjectData.projectLeadId === studentId && (
+              {activeTab === 'tasks' && (
                 <TaskManagement
                   projectId={selectedProjectData.id}
                   projectLeadId={selectedProjectData.projectLeadId}
@@ -373,78 +395,6 @@ function ProjectManagement({ studentId, workspaceAction }) {
                     <button type="submit" className="send-btn">Send</button>
                   </form>
                 </div>
-              )}
-
-              {!(selectedProjectData.projectLeadId === studentId) && (
-                <>
-                  <div className="info-section">
-                    <h4>Description</h4>
-                    <p>{selectedProjectData.description}</p>
-                  </div>
-
-                  <div className="info-section">
-                    <h4>Technologies</h4>
-                    <div className="tech-tags">
-                      {selectedProjectData.technologies.map((tech) => (
-                        <span key={tech} className="tech-tag">{tech}</span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="info-section">
-                    <h4>Progress</h4>
-                    <div className="progress-bar large">
-                      <div className="progress-fill" style={{ width: `${selectedProjectData.progressPercent}%` }} />
-                    </div>
-                    <p className="progress-text">{selectedProjectData.progressPercent}% Complete</p>
-                  </div>
-
-                  <div className="info-section">
-                    <h4>Deadline</h4>
-                    <p>{selectedProjectData.deadline ? new Date(selectedProjectData.deadline).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'No deadline set'}</p>
-                  </div>
-
-                  <div className="info-section">
-                    <h4>Team Members</h4>
-                    <div className="team-members">
-                      {selectedProjectData.teamMembers.map((member) => (
-                        <div key={member.id} className="team-member">
-                          <div className="member-avatar">{member.name.substring(0, 1)}</div>
-                          <div className="member-info">
-                            <strong>{member.name}</strong>
-                            <p>{member.role}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="project-chat">
-                    <h4>Team Chat</h4>
-                    <div className="chat-messages">
-                      {selectedProjectChatMessages.length === 0 ? (
-                        <p className="no-messages">No messages yet. Start the conversation!</p>
-                      ) : (
-                        selectedProjectChatMessages.map((msg) => (
-                          <div key={msg.id} className="chat-message">
-                            <strong>{msg.senderName}</strong>
-                            <p>{msg.message}</p>
-                            <span className="message-time">{new Date(msg.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                    <form className="chat-input-form" onSubmit={handleSendMessage}>
-                      <input
-                        type="text"
-                        placeholder="Type your message..."
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                      />
-                      <button type="submit" className="send-btn">Send</button>
-                    </form>
-                  </div>
-                </>
               )}
             </div>
           </section>

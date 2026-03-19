@@ -1382,6 +1382,22 @@ body.dark-mode .pill.badge {
   gap: 18px;
 }
 
+.workspace-notice {
+  margin: 0;
+  font-size: 13px;
+  color: #075985;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+[data-theme='dark'] .workspace-notice {
+  background: #0c4a6e;
+  border-color: #075985;
+  color: #dbeafe;
+}
+
 .info-section {
   border-bottom: 1px solid var(--card-border);
   padding-bottom: 16px;
