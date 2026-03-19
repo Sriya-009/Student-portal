@@ -326,7 +326,7 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
             </div>
 
             <label htmlFor="fileInput">Select File *</label>
-            <div className="file-input-wrapper">
+            <label htmlFor="fileInput" className="file-input-wrapper">
               <input
                 id="fileInput"
                 type="file"
@@ -337,7 +337,7 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
               <span className="file-name">
                 {uploadedFile ? uploadedFile.name : 'Choose a file...'}
               </span>
-            </div>
+            </label>
             <small>Supported: Documents, Presentations, Spreadsheets, Code, Archives</small>
 
             <label htmlFor="fileDesc">Description/Version Notes *</label>
