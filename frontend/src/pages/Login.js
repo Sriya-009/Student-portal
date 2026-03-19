@@ -59,7 +59,7 @@ function Login() {
     else navigate('/student');
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setResetMessage('');
@@ -73,12 +73,12 @@ function Login() {
 
     try {
       if (otpSession) {
-        const verifiedUser = verifyOtp(otpSession.otpSessionId, otpCode);
+        const verifiedUser = await verifyOtp(otpSession.otpSessionId, otpCode);
         routeByRole(verifiedUser.role);
         return;
       }
 
-      const loggedInUser = login(identifier, password);
+      const loggedInUser = await login(identifier, password);
 
       if (loggedInUser.requiresOtp) {
         setOtpSession(loggedInUser);
@@ -98,12 +98,12 @@ function Login() {
     }
   };
 
-  const handleForgotPassword = () => {
+  const handleForgotPassword = async () => {
     setError('');
     setResetMessage('');
     setShowForgotPassword(false);
     try {
-      const result = forgotPassword(identifier);
+      const result = await forgotPassword(identifier);
       setResetMessage(result.message);
     } catch (forgotError) {
       setError(forgotError.message || 'Unable to process password reset.');

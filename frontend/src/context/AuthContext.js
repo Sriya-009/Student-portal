@@ -6,8 +6,8 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
-  const login = (email, password) => {
-    const loginResult = loginUser(email, password);
+  const login = async (email, password) => {
+    const loginResult = await loginUser(email, password);
 
     if (loginResult.requiresOtp) {
       return loginResult;
@@ -17,25 +17,25 @@ export function AuthProvider({ children }) {
     return loginResult;
   };
 
-  const verifyOtp = (otpSessionId, otpCode) => {
-    const loggedInStaff = verifyStaffOtp(otpSessionId, otpCode);
+  const verifyOtp = async (otpSessionId, otpCode) => {
+    const loggedInStaff = await verifyStaffOtp(otpSessionId, otpCode);
     setUser(loggedInStaff);
     return loggedInStaff;
   };
 
-  const signup = (name, email, password, role) => {
-    const createdUser = signupUser(name, email, password, role);
+  const signup = async (name, email, password, role) => {
+    const createdUser = await signupUser(name, email, password, role);
     setUser(createdUser);
     return createdUser;
   };
 
   const logout = () => setUser(null);
 
-  const resend = (otpSessionId) => {
+  const resend = async (otpSessionId) => {
     return resendOtp(otpSessionId);
   };
 
-  const forgotPassword = (identifier) => {
+  const forgotPassword = async (identifier) => {
     return requestPasswordReset(identifier);
   };
 

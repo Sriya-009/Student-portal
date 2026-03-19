@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { registerAdminCreatedUser } from '../../services/authService';
 
 function AdminControlCenter({ students, mentors, projects, files, submissionEvents, activeSection, activeAction }) {
   const [users, setUsers] = useState(() => [
@@ -56,7 +57,7 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
     ]);
   };
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!newUser.id.trim() || !newUser.name.trim() || !newUser.email.trim()) {
       alert('Please fill ID, name, and email to register a user.');
       return;
@@ -119,9 +120,28 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
       approved: false
     };
 
+    let managedCredentials;
+    try {
+      managedCredentials = await registerAdminCreatedUser({
+        identifier: createdUser.id,
+        name: createdUser.name,
+        email: createdUser.email,
+        department: createdUser.department,
+        role: createdUser.role,
+        phone: '+91 90000 00000'
+      });
+    } catch (registrationError) {
+      alert(registrationError.message || 'Failed to generate user credentials.');
+      return;
+    }
+
     setUsers((prev) => [createdUser, ...prev]);
     setDbRecordCount((prev) => prev + 1);
-    addLog(`Registered user ${createdUser.id} (${createdUser.role}) - Duplicate prevention checks passed`);
+    addLog(`Registered user ${createdUser.id} (${createdUser.role})`);
+
+    alert(
+      `User created successfully.\n\nIdentifier: ${managedCredentials.identifier}\nRole: ${managedCredentials.role}\nDefault Password: ${managedCredentials.password}\n\nJWT will be generated automatically after successful login.`
+    );
     setNewUser({ id: '', name: '', email: '', department: '', role: 'student' });
   };
 

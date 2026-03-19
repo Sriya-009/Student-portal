@@ -52,3 +52,24 @@ student-project-manager/
 - `npm start` - Runs app in development mode
 - `npm test` - Runs tests
 - `npm run build` - Creates production build
+
+## MySQL Workbench Connection Setup
+
+1. Install dependencies:
+`npm install`
+
+2. Create `.env` from `.env.example` and set your MySQL credentials.
+
+3. In MySQL Workbench, run:
+`server/sql/init.sql`
+
+4. Start backend API server:
+`npm run server`
+
+5. Start frontend in another terminal:
+`npm start`
+
+6. Verify backend + database health:
+`http://localhost:5000/api/health`
+
+When admin creates a new user, the project now also attempts to persist that user in MySQL via the backend API.

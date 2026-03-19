@@ -12,12 +12,12 @@ function Signup() {
   const { signup } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
 
     try {
-      signup(name, email, password, role);
+      await signup(name, email, password, role);
       if (role === 'admin') navigate('/admin');
       else if (role === 'faculty') navigate('/faculty');
       else navigate('/student');
