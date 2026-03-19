@@ -3,6 +3,7 @@ import { bTechProjects, projectChats, projectTasks, projectFiles } from '../data
 import TaskManagement from './TaskManagement';
 import FileManagement from './FileManagement';
 import ProjectFilter from './ProjectFilter';
+import ProjectWorkspaceSidebar from './ProjectWorkspaceSidebar';
 
 function ProjectManagement({ studentId }) {
   const [projects, setProjects] = useState(bTechProjects);
@@ -105,47 +106,51 @@ function ProjectManagement({ studentId }) {
     <div className="project-management">
       <section className="page-head page-head-row">
         <div>
-          <h1>Project Management</h1>
-          <p>Manage your B.Tech projects, collaborate with team members, and track progress</p>
+          <h1>My Projects</h1>
+          <p>View and manage your B.Tech projects</p>
         </div>
         <button type="button" className="primary-dark-btn" onClick={() => setShowCreateForm(true)}>
           + Create New Project
         </button>
       </section>
 
-      <ProjectFilter
-        projects={projects.filter((p) => p.teamMemberIds.includes(studentId))}
-        onFilterChange={setProjectFilter}
-        activeFilter={projectFilter}
-      />
-
       <div className="project-grid">
-        <section className="project-list">
-          <h3>Your Projects</h3>
-          {studentProjects.length === 0 ? (
-            <p className="no-projects">No projects yet. Create your first one!</p>
-          ) : (
-            studentProjects.map((project) => (
-              <article
-                key={project.id}
-                className={`project-card ${selectedProject === project.id ? 'active' : ''}`}
-                onClick={() => setSelectedProject(project.id)}
-              >
-                <div className="project-card-head">
-                  <h4>{project.name}</h4>
-                  <span className={`status-badge ${project.status}`}>{project.status}</span>
-                </div>
-                <p className="project-description">{project.description}</p>
-                <div className="project-meta">
-                  <span>Team: {project.teamMembers.length} members</span>
-                  <span>Progress: {project.progressPercent}%</span>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${project.progressPercent}%` }} />
-                </div>
-              </article>
-            ))
-          )}
+        <section className="project-left-column">
+          <ProjectWorkspaceSidebar />
+
+          <ProjectFilter
+            projects={projects.filter((p) => p.teamMemberIds.includes(studentId))}
+            onFilterChange={setProjectFilter}
+            activeFilter={projectFilter}
+          />
+
+          <section className="project-list">
+            <h3>Your Projects</h3>
+            {studentProjects.length === 0 ? (
+              <p className="no-projects">No projects yet. Create your first one!</p>
+            ) : (
+              studentProjects.map((project) => (
+                <article
+                  key={project.id}
+                  className={`project-card ${selectedProject === project.id ? 'active' : ''}`}
+                  onClick={() => setSelectedProject(project.id)}
+                >
+                  <div className="project-card-head">
+                    <h4>{project.name}</h4>
+                    <span className={`status-badge ${project.status}`}>{project.status}</span>
+                  </div>
+                  <p className="project-description">{project.description}</p>
+                  <div className="project-meta">
+                    <span>Team: {project.teamMembers.length} members</span>
+                    <span>Progress: {project.progressPercent}%</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width: `${project.progressPercent}%` }} />
+                  </div>
+                </article>
+              ))
+            )}
+          </section>
         </section>
 
         {selectedProjectData ? (
