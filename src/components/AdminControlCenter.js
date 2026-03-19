@@ -134,7 +134,6 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
 
   const handleUpdateData = () => {
     addLog('Performed database update operation');
-    alert('Database update operation completed.');
   };
 
   const handleDeleteData = () => {
@@ -216,7 +215,6 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
       return;
     }
     addLog(`Restored backup from ${backupHistory[0].createdAt}`);
-    alert(`Backup restored: ${backupHistory[0].createdAt}`);
   };
 
   const completionRate = useMemo(() => {
@@ -280,7 +278,6 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
 
     setArchivedProjectIds(new Set([...archivedProjectIds, ...completedIds]));
     addLog(`Archived ${completedIds.length} completed projects`);
-    alert(`${completedIds.length} completed projects archived.`);
   };
 
   const section = activeSection || 'user-management';
@@ -310,97 +307,103 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
     <section className="faculty-panel admin-control-panel">
       <div className="panel-grid">
         <div className="stat-card">
-          <h3>Total Users</h3>
+          <h3>Registered Users</h3>
           <p className="stat-value">{users.length}</p>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Students & Faculty</p>
         </div>
         <div className="stat-card">
-          <h3>Total Projects</h3>
+          <h3>Active Projects</h3>
           <p className="stat-value">{projectsState.length}</p>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>B.Tech Programs</p>
         </div>
         <div className="stat-card">
-          <h3>Database Records</h3>
+          <h3>System Records</h3>
           <p className="stat-value">{dbRecordCount}</p>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Database Entries</p>
         </div>
         <div className="stat-card">
-          <h3>Completion Rate</h3>
+          <h3>Overall Progress</h3>
           <p className="stat-value">{completionRate}%</p>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>Projects Completed</p>
         </div>
       </div>
 
       <div className="panel-content">
         <div className="admin-operations-grid">
           {showUser && (<article className="admin-operation-card">
-            <h3>User Management</h3>
-            <p className="muted-line">Mode: {userAction.replace('user-', '').replace('-', ' ')}</p>
+            <h3>👥 User Management</h3>
+            <p className="muted-line">{userAction === 'user-add-register' ? 'Register New Users' : userAction === 'user-management-overview' ? 'Overview & Management' : userAction === 'user-approve-remove' ? 'Approve & Remove Access' : 'Manage User Roles & Details'}</p>
             {(userAction === 'user-add-register' || userAction === 'user-management-overview') && <div className="admin-form-grid">
-              <input className="form-input" placeholder="ID" value={newUser.id} onChange={(e) => setNewUser({ ...newUser, id: e.target.value })} />
-              <input className="form-input" placeholder="Name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
-              <input className="form-input" placeholder="Email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
-              <input className="form-input" placeholder="Department" value={newUser.department} onChange={(e) => setNewUser({ ...newUser, department: e.target.value })} />
+              <input className="form-input" placeholder="User ID (e.g., STU001, FAC123)" value={newUser.id} onChange={(e) => setNewUser({ ...newUser, id: e.target.value })} />
+              <input className="form-input" placeholder="Full Name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
+              <input className="form-input" placeholder="Email Address" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+              <input className="form-input" placeholder="Department (Optional)" value={newUser.department} onChange={(e) => setNewUser({ ...newUser, department: e.target.value })} />
               <select className="form-select" value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}>
                 <option value="student">Student</option>
                 <option value="faculty">Faculty</option>
               </select>
-              <button className="btn-primary" onClick={handleAddUser}>Add/Register</button>
+              <button className="btn-primary" onClick={handleAddUser}>Register User</button>
             </div>}
 
             {(userAction === 'user-approve-remove' || userAction === 'user-manage-roles' || userAction === 'user-management-overview') && <div className="admin-list">
-              <div className="admin-form-grid" style={{ marginBottom: '4px' }}>
+              <div className="admin-form-grid" style={{ marginBottom: '8px' }}>
                 <input
                   className="form-input"
-                  placeholder="Search student by ID (e.g., STU001)"
+                  placeholder="Search users by ID, name, or email"
                   value={studentIdSearch}
                   onChange={(e) => setStudentIdSearch(e.target.value)}
                 />
-                <button className="btn-secondary" onClick={() => setStudentIdSearch('')}>Clear Search</button>
+                <button className="btn-secondary" onClick={() => setStudentIdSearch('')}>Clear</button>
               </div>
 
               {filteredUsers.length === 0 ? (
-                <p className="muted-line">No student found for ID: {studentIdSearch}</p>
+                <p className="muted-line">No users found for: {studentIdSearch}</p>
               ) : null}
 
               {filteredUsers.map((user) => (
                 <div key={user.id} className="admin-list-item">
                   <div>
-                    <strong>{user.id} - {user.name}</strong>
-                    <p>{user.role} | {user.department}</p>
+                    <strong>{user.id} · {user.name}</strong>
+                    <p>{user.role === 'student' ? '🎓 Student' : '👨‍🏫 Faculty'} · {user.department}</p>
                   </div>
                   <div className="button-group">
-                    <button className="btn-secondary" onClick={() => toggleUserApproval(user.id)}>{user.approved ? 'Approved' : 'Approve'}</button>
+                    <button className="btn-secondary" onClick={() => toggleUserApproval(user.id)}>{user.approved ? '✓ Approved' : 'Approve'}</button>
                     <select className="form-select compact" value={user.role} onChange={(e) => handleRoleChange(user.id, e.target.value)}>
                       <option value="student">Student</option>
                       <option value="faculty">Faculty</option>
                     </select>
                     <button className="btn-secondary" onClick={() => startEditUser(user)}>Edit</button>
-                    <button className="btn-danger" onClick={() => removeUser(user.id)}>Remove</button>
+                    <button className="btn-danger" onClick={() => removeUser(user.id)}>Deactivate</button>
                   </div>
                 </div>
               ))}
             </div>}
 
             {(userAction === 'user-update-details' || editUserId) ? (
-              <div className="admin-form-grid">
-                <input className="form-input" placeholder="Name" value={editUser.name} onChange={(e) => setEditUser({ ...editUser, name: e.target.value })} />
-                <input className="form-input" placeholder="Email" value={editUser.email} onChange={(e) => setEditUser({ ...editUser, email: e.target.value })} />
+              <div className="admin-form-grid" style={{ marginTop: '12px', padding: '12px', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px' }}>
+                <input className="form-input" placeholder="Full Name" value={editUser.name} onChange={(e) => setEditUser({ ...editUser, name: e.target.value })} />
+                <input className="form-input" placeholder="Email Address" value={editUser.email} onChange={(e) => setEditUser({ ...editUser, email: e.target.value })} />
                 <input className="form-input" placeholder="Department" value={editUser.department} onChange={(e) => setEditUser({ ...editUser, department: e.target.value })} />
-                <button className="btn-success" onClick={saveEditUser}>Update User Details</button>
+                <button className="btn-success" onClick={saveEditUser}>💾 Save Changes</button>
               </div>
             ) : null}
           </article>)}
 
           {showSystem && (<article className="admin-operation-card">
-            <h3>System Management</h3>
-            <p className="muted-line">Mode: {systemAction.replace('system-', '').replace('-', ' ')}</p>
-            <p>System Status: <strong>{systemHealthy ? 'Healthy' : 'Attention Required'}</strong></p>
-            <p>Access Control: <strong>{accessControlEnabled ? 'Enabled' : 'Disabled'}</strong></p>
+            <h3>⚙ System Management</h3>
+            <p className="muted-line">{systemAction === 'system-maintain' ? 'System Health & Maintenance' : systemAction === 'system-database' ? 'Database Operations' : 'System Status Dashboard'}</p>
+            <div style={{ marginBottom: '12px' }}>
+              <p>System Status: <strong style={{ color: systemHealthy ? '#22c55e' : '#ef4444' }}>● {systemHealthy ? 'Healthy' : 'Requires Attention'}</strong></p>
+              <p>Access Control: <strong>{accessControlEnabled ? '✓ Enabled' : '✗ Disabled'}</strong></p>
+            </div>
             {(systemAction === 'system-maintain' || systemAction === 'system-management-overview') && <div className="button-group">
-              <button className="btn-secondary" onClick={() => setSystemHealthy((prev) => !prev)}>Maintain Functionality</button>
-              <button className="btn-secondary" onClick={() => setAccessControlEnabled((prev) => !prev)}>Access Control</button>
+              <button className="btn-secondary" onClick={() => setSystemHealthy((prev) => !prev)}>{systemHealthy ? 'Mark Maintenance' : 'Resume Operations'}</button>
+              <button className="btn-secondary" onClick={() => setAccessControlEnabled((prev) => !prev)}>Toggle Access Control</button>
             </div>}
             {(systemAction === 'system-database' || systemAction === 'system-management-overview') && <div className="button-group">
-              <button className="btn-primary" onClick={handleStoreData}>Store Data</button>
-              <button className="btn-info" onClick={handleUpdateData}>Update Data</button>
-              <button className="btn-danger" onClick={handleDeleteData}>Delete Data</button>
+              <button className="btn-primary" onClick={handleStoreData}>Add Record</button>
+              <button className="btn-info" onClick={handleUpdateData}>Update Records</button>
+              <button className="btn-danger" onClick={handleDeleteData}>Remove Record</button>
             </div>}
           </article>)}
 
@@ -437,106 +440,135 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
           </article>)}
 
           {showMonitoring && (<article className="admin-operation-card">
-            <h3>Monitoring & Control</h3>
-            <p className="muted-line">Mode: {monitorAction.replace('monitor-', '').replace('-', ' ')}</p>
-            <p>User Activity Logs: <strong>{activityLogs.length}</strong></p>
-            <p>Deadlines due in 24h: <strong>{dueSoonCount}</strong></p>
+            <h3>📊 Operational Monitoring</h3>
+            <p className="muted-line">Track system activity and project timelines</p>
+            <div style={{ marginBottom: '12px' }}>
+              <p>Activity Logs: <strong>{activityLogs.length}</strong> events recorded</p>
+              <p>Urgent Deadlines: <strong style={{ color: dueSoonCount > 0 ? '#f59e0b' : '#22c55e' }}>{dueSoonCount}</strong> due within 24 hours</p>
+            </div>
             <div className="admin-log-list">
+              <p style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Recent Activity:</p>
               {activityLogs.slice(0, 6).map((log) => (
-                <p key={log.id}><strong>{log.time}</strong> - {log.message}</p>
+                <p key={log.id}><strong>{log.time}</strong> — {log.message}</p>
               ))}
             </div>
           </article>)}
 
           {showData && (<article className="admin-operation-card">
-            <h3>Data & File Management</h3>
-            <p className="muted-line">Mode: {dataAction.replace('data-', '').replace('-', ' ')}</p>
-            <p>Uploaded Files: <strong>{files.length}</strong></p>
-            <p>Project Records: <strong>{projectsState.length}</strong></p>
+            <h3>🗄 Data Governance & Records</h3>
+            <p className="muted-line">Manage institutional data, files, and backups</p>
+            <div style={{ marginBottom: '12px' }}>
+              <p>Project Files: <strong>{files.length}</strong> documents in system</p>
+              <p>Active Records: <strong>{projectsState.length}</strong> project entries</p>
+            </div>
             {(dataAction === 'data-backup-restore' || dataAction === 'data-file-management-overview') && <div className="button-group">
-              <button className="btn-primary" onClick={handleCreateBackup}>Backup Data</button>
-              <button className="btn-secondary" onClick={handleRestoreBackup}>Restore Data</button>
+              <button className="btn-primary" onClick={handleCreateBackup}>📁 Create Backup</button>
+              <button className="btn-secondary" onClick={handleRestoreBackup}>⟲ Restore from Backup</button>
             </div>}
             <div className="admin-log-list">
-              {backupHistory.slice(0, 4).map((backup) => (
-                <p key={backup.id}><strong>{backup.createdAt}</strong> - {backup.records} records</p>
-              ))}
+              {backupHistory.length > 0 ? (
+                <>
+                  <p style={{ fontSize: '12px', fontWeight: '600', marginBottom: '8px' }}>Backup History:</p>
+                  {backupHistory.slice(0, 4).map((backup) => (
+                    <p key={backup.id}><strong>{backup.createdAt}</strong> — {backup.records} records</p>
+                  ))}
+                </>
+              ) : (
+                <p className="muted-line">No backups yet. Create one to secure your data.</p>
+              )}
             </div>
           </article>)}
 
           {showReports && (<article className="admin-operation-card">
-            <h3>Reports & Analytics</h3>
-            <p className="muted-line">Mode: {reportAction.replace('report-', '').replace('-', ' ')}</p>
-            <p>System-wide report includes users, projects, and deadlines.</p>
-            <p>Completion Rate: <strong>{completionRate}%</strong></p>
-            <p>Pending Work: <strong>{projectsState.filter((project) => project.status !== 'completed').length}</strong> projects</p>
+            <h3>📈 Reports & Analytics</h3>
+            <p className="muted-line">View project completion rates and system statistics</p>
+            <div style={{ marginBottom: '12px' }}>
+              <p>Completion Rate: <strong style={{ fontSize: '18px', color: '#3b82f6' }}>{completionRate}%</strong></p>
+              <p>Pending Projects: <strong>{projectsState.filter((project) => project.status !== 'completed').length}</strong> in progress</p>
+              <p>Total Users: <strong>{users.length}</strong> registered</p>
+            </div>
             <button className="btn-success" onClick={() => {
               addLog('Generated system-wide report');
-              alert('System report generated successfully.');
             }}>
-              Generate Report
+              📄 Generate System Report
             </button>
           </article>)}
 
           {showNotify && (<article className="admin-operation-card">
-            <h3>Notifications & Communication</h3>
-            <p className="muted-line">Mode: {notifyAction.replace('notify-', '').replace('-', ' ')}</p>
+            <h3>📢 Notifications & Communication</h3>
+            <p className="muted-line">Send announcements and deadline reminders to users</p>
+            {dueSoonCount > 0 && <p style={{ padding: '8px', backgroundColor: '#fef3c7', borderRadius: '4px', marginBottom: '8px', fontSize: '13px' }}>⚠ {dueSoonCount} deadlines due in 24 hours — consider sending a reminder</p>}
             <textarea
               className="form-textarea"
               rows="3"
-              placeholder="Send announcement or deadline update"
+              placeholder="Type your announcement or deadline update message here..."
               value={announcementText}
               onChange={(e) => setAnnouncementText(e.target.value)}
             />
-            <button className="btn-primary" onClick={sendAnnouncement}>Send Announcement</button>
-            {notifyAction === 'notify-deadlines' && (
-              <p className="muted-line">{dueSoonCount} deadlines are due in the next 24 hours. Send an update to all users.</p>
-            )}
+            <button className="btn-primary" onClick={sendAnnouncement}>📤 Send to All Users</button>
             <div className="admin-log-list">
-              {announcements.slice(0, 4).map((announcement) => (
-                <p key={announcement.id}><strong>{announcement.sentAt}</strong> - {announcement.message}</p>
-              ))}
+              {announcements.length > 0 ? (
+                <>
+                  <p style={{ fontSize: '12px', fontWeight: '600', marginTop: '12px', marginBottom: '8px' }}>Sent Announcements:</p>
+                  {announcements.slice(0, 4).map((announcement) => (
+                    <p key={announcement.id}><strong>{announcement.sentAt}</strong> — {announcement.message}</p>
+                  ))}
+                </>
+              ) : (
+                <p className="muted-line" style={{ marginTop: '8px' }}>No announcements sent yet.</p>
+              )}
             </div>
           </article>)}
 
           {showSecurity && (<article className="admin-operation-card">
-            <h3>Security Management</h3>
-            <p className="muted-line">Mode: {securityAction.replace('security-', '').replace('-', ' ')}</p>
-            <p>Authentication: <strong>{securityState.authEnabled ? 'Enabled' : 'Disabled'}</strong></p>
-            <p>Permission Policy: <strong>{securityState.strictPermissions ? 'Strict' : 'Standard'}</strong></p>
-            <div className="button-group">
-              <button className="btn-secondary" onClick={() => setSecurityState((prev) => ({ ...prev, authEnabled: !prev.authEnabled }))}>Toggle Authentication</button>
-              <button className="btn-secondary" onClick={() => setSecurityState((prev) => ({ ...prev, strictPermissions: !prev.strictPermissions }))}>Manage Permissions</button>
+            <h3>🔐 Security Management</h3>
+            <p className="muted-line">Configure authentication, permissions, and security settings</p>
+            <div style={{ marginBottom: '12px' }}>
+              <p>Authentication: <strong style={{ color: securityState.authEnabled ? '#22c55e' : '#ef4444' }}>● {securityState.authEnabled ? 'Enabled' : 'Disabled'}</strong></p>
+              <p>Permission Level: <strong>{securityState.strictPermissions ? '🔒 Strict' : '🔓 Standard'}</strong></p>
             </div>
-            <button className="btn-info" onClick={runSecurityAudit}>Run Privacy Audit</button>
-            {securityState.lastAudit ? <p>Last Audit: <strong>{securityState.lastAudit}</strong></p> : null}
+            <div className="button-group">
+              <button className="btn-secondary" onClick={() => setSecurityState((prev) => ({ ...prev, authEnabled: !prev.authEnabled }))}>Toggle Auth</button>
+              <button className="btn-secondary" onClick={() => setSecurityState((prev) => ({ ...prev, strictPermissions: !prev.strictPermissions }))}>Change Permissions</button>
+            </div>
+            <button className="btn-info" onClick={runSecurityAudit}>🛡 Run Security Audit</button>
+            {securityState.lastAudit && <p style={{ fontSize: '12px', marginTop: '8px' }}>Last Audit: <strong>{securityState.lastAudit}</strong></p>}
           </article>)}
 
           {showMaintenance && (<article className="admin-operation-card">
-            <h3>Maintenance</h3>
-            <p className="muted-line">Mode: {maintenanceAction.replace('maintenance-', '').replace('-', ' ')}</p>
-            <input className="form-input" placeholder="Log system issue" value={issueText} onChange={(e) => setIssueText(e.target.value)} />
-            <button className="btn-danger" onClick={logMaintenanceIssue}>Fix System Issue</button>
-            <input className="form-input" placeholder="Feature update notes" value={featureText} onChange={(e) => setFeatureText(e.target.value)} />
-            <button className="btn-primary" onClick={logFeatureUpdate}>Update Feature</button>
+            <h3>🔧 System Maintenance & Support</h3>
+            <p className="muted-line">Log issues, schedule updates, and monitor performance</p>
+            <input className="form-input" placeholder="Describe system issue or problem" value={issueText} onChange={(e) => setIssueText(e.target.value)} />
+            <button className="btn-danger" onClick={logMaintenanceIssue}>⚠ Report Issue</button>
+            <input className="form-input" placeholder="Describe feature update or improvement" value={featureText} onChange={(e) => setFeatureText(e.target.value)} />
+            <button className="btn-primary" onClick={logFeatureUpdate}>✨ Schedule Update</button>
             {maintenanceAction === 'maintenance-smooth-performance' && (
-              <button className="btn-secondary" onClick={() => addLog('Performance check completed: system running smoothly')}>Run Performance Check</button>
+              <button className="btn-secondary" onClick={() => addLog('Performance check completed: system running smoothly')}>⚡ Check Performance</button>
             )}
             <div className="admin-log-list">
-              {maintenanceHistory.slice(0, 4).map((entry) => (
-                <p key={entry.id}><strong>{entry.type}</strong> - {entry.text}</p>
-              ))}
+              {maintenanceHistory.length > 0 ? (
+                <>
+                  <p style={{ fontSize: '12px', fontWeight: '600', marginTop: '12px', marginBottom: '8px' }}>Maintenance History:</p>
+                  {maintenanceHistory.slice(0, 4).map((entry) => (
+                    <p key={entry.id}><strong>{entry.type === 'issue' ? '⚠' : '✨'} {entry.type}</strong> — {entry.text}</p>
+                  ))}
+                </>
+              ) : (
+                <p className="muted-line" style={{ marginTop: '8px' }}>No maintenance history yet.</p>
+              )}
             </div>
           </article>)}
 
           {showFinal && (<article className="admin-operation-card">
-            <h3>Final Actions</h3>
-            <p className="muted-line">Mode: {finalAction.replace('final-', '').replace('-', ' ')}</p>
-            <p>Archived Projects: <strong>{archivedProjectIds.size}</strong></p>
-            <p>Operation Logs: <strong>{activityLogs.length}</strong></p>
-            {(finalAction === 'final-archive-projects' || finalAction === 'final-actions-overview') && <button className="btn-secondary" onClick={archiveCompletedProjects}>Archive Completed Projects</button>}
-            {(finalAction === 'final-maintain-history' || finalAction === 'final-actions-overview') && <button className="btn-info" onClick={() => alert('History maintained and system operations reviewed.')}>Maintain History</button>}
-            {(finalAction === 'final-oversee-operations' || finalAction === 'final-actions-overview') && <button className="btn-primary" onClick={() => addLog('Completed overall system operations review')}>Oversee Operations</button>}
+            <h3>📦 Project Closure & Archives</h3>
+            <p className="muted-line">Archive completed projects and maintain operational history</p>
+            <div style={{ marginBottom: '12px' }}>
+              <p>Archived Projects: <strong>{archivedProjectIds.size}</strong></p>
+              <p>Operation Records: <strong>{activityLogs.length}</strong> logged</p>
+            </div>
+            {(finalAction === 'final-archive-projects' || finalAction === 'final-actions-overview') && <button className="btn-secondary" onClick={archiveCompletedProjects}>📦 Archive Completed Projects</button>}
+            {(finalAction === 'final-maintain-history' || finalAction === 'final-actions-overview') && <button className="btn-info" onClick={() => addLog('System history reviewed and maintained')}>📋 Review History</button>}
+            {(finalAction === 'final-oversee-operations' || finalAction === 'final-actions-overview') && <button className="btn-primary" onClick={() => addLog('Completed overall system operations review')}>✓ Complete Operations Review</button>}
           </article>)}
         </div>
       </div>

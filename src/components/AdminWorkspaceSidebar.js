@@ -21,31 +21,21 @@ const adminSections = [
     ]
   },
   {
-    id: 'project-management',
-    title: 'Project Management',
-    items: [
-      { label: 'View All Projects', actionId: 'project-view-all' },
-      { label: 'Approve/Reject Creation', actionId: 'project-approve-reject' },
-      { label: 'Assign Faculty/Mentors', actionId: 'project-assign-mentor' },
-      { label: 'Monitor Project Status', actionId: 'project-monitor-status' }
-    ]
-  },
-  {
     id: 'monitoring-control',
-    title: 'Monitoring & Control',
+    title: 'Operational Monitoring',
     items: [
-      { label: 'Track User Activities', actionId: 'monitor-track-activities' },
-      { label: 'Monitor Project Progress', actionId: 'monitor-project-progress' },
-      { label: 'Ensure Deadlines', actionId: 'monitor-deadlines' }
+      { label: 'Audit User Activity', actionId: 'monitor-track-activities' },
+      { label: 'Track Project Execution', actionId: 'monitor-project-progress' },
+      { label: 'Manage Deadline Compliance', actionId: 'monitor-deadlines' }
     ]
   },
   {
     id: 'data-file-management',
-    title: 'Data & File Management',
+    title: 'Data Governance & Records',
     items: [
-      { label: 'Manage Files/Documents', actionId: 'data-manage-files' },
+      { label: 'Manage Documents & Assets', actionId: 'data-manage-files' },
       { label: 'Maintain Project Records', actionId: 'data-project-records' },
-      { label: 'Backup & Restore Data', actionId: 'data-backup-restore' }
+      { label: 'Backup and Recovery', actionId: 'data-backup-restore' }
     ]
   },
   {

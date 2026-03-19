@@ -41,7 +41,6 @@ function AdminDashboard() {
               setActiveAction(actionId);
               if (actionId.startsWith('user-')) setActiveSection('user-management');
               else if (actionId.startsWith('system-')) setActiveSection('system-management');
-              else if (actionId.startsWith('project-')) setActiveSection('project-management');
               else if (actionId.startsWith('monitor-')) setActiveSection('monitoring-control');
               else if (actionId.startsWith('data-')) setActiveSection('data-file-management');
               else if (actionId.startsWith('report-')) setActiveSection('reports-analytics');
@@ -79,14 +78,13 @@ function getAdminTitle(sectionId) {
   const titles = {
     'user-management': 'User Management',
     'system-management': 'System Management',
-    'project-management': 'Project Management',
-    'monitoring-control': 'Monitoring & Control',
-    'data-file-management': 'Data & File Management',
+    'monitoring-control': 'Operational Monitoring',
+    'data-file-management': 'Data Governance & Records',
     'reports-analytics': 'Reports & Analytics',
     'notifications-communication': 'Notifications & Communication',
     'security-management': 'Security Management',
-    maintenance: 'Maintenance',
-    'final-actions': 'Final Actions'
+    maintenance: 'System Maintenance & Support',
+    'final-actions': 'Project Closure & Archives'
   };
   return titles[sectionId] || 'Admin Dashboard';
 }
@@ -95,14 +93,13 @@ function getAdminDescription(sectionId) {
   const descriptions = {
     'user-management': 'Add users, manage approvals, roles, and account details.',
     'system-management': 'Maintain system health, database operations, and access controls.',
-    'project-management': 'Approve projects, assign mentors, and monitor delivery status.',
-    'monitoring-control': 'Track activities, progress, and timeline compliance.',
-    'data-file-management': 'Manage files/records and run backup or restore operations.',
+    'monitoring-control': 'Audit activity, track project execution, and enforce timeline compliance.',
+    'data-file-management': 'Govern institutional records, documents, backups, and recovery operations.',
     'reports-analytics': 'Generate reports and analyze completion and pending statistics.',
     'notifications-communication': 'Broadcast announcements and deadline updates to users.',
-    'security-management': 'Handle authentication, privacy controls, and permissions.',
-    maintenance: 'Fix issues, update features, and maintain performance stability.',
-    'final-actions': 'Archive projects, preserve history, and oversee operations.'
+    'security-management': 'Configure authentication settings, manage permissions, and run security audits.',
+    maintenance: 'Log system issues, schedule feature updates, and maintain system performance.',
+    'final-actions': 'Archive completed projects and maintain historical operation records.'
   };
   return descriptions[sectionId] || 'Manage complete admin operations from one workspace.';
 }
