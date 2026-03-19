@@ -10,7 +10,6 @@ import { students, submissionEvents } from '../data/portalData';
 import '../styles/dashboard.css';
 
 function StudentDashboard() {
-  const [activeView, setActiveView] = useState('projects');
   const [workspaceAction, setWorkspaceAction] = useState(null);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -47,16 +46,8 @@ function StudentDashboard() {
       <div className="portal-layout">
         <aside className="portal-sidebar">
           <ProjectWorkspaceSidebar
-            onSectionSelect={(sectionId) => {
-              if (sectionId === 'my-projects') {
-                setActiveView('projects');
-              }
-              if (sectionId === 'submission' || sectionId === 'team-collaboration' || sectionId === 'task-management' || sectionId === 'file-handling' || sectionId === 'feedback-evaluation' || sectionId === 'documentation') {
-                setActiveView('projects');
-              }
-            }}
+            onSectionSelect={() => {}}
             onActionSelect={(actionId) => {
-              setActiveView('projects');
               setWorkspaceAction({ id: actionId, timestamp: Date.now() });
             }}
           />
@@ -64,12 +55,8 @@ function StudentDashboard() {
 
         <main className="portal-main">
           <section className="page-head">
-            <h1>{activeView === 'projects' ? 'Student Workspace' : 'Submission Calendar'}</h1>
-            <p>
-              {activeView === 'projects'
-                ? 'Focus on project execution while faculty and admin handle review and platform operations.'
-                : 'Track all due dates and submission events in one place.'}
-            </p>
+            <h1>Student Workspace</h1>
+            <p>Track deadlines and manage project work from one place.</p>
           </section>
 
           <NotificationPanel 
@@ -78,16 +65,16 @@ function StudentDashboard() {
             phoneNumber={currentStudent.phoneNumber}
             studentName={currentStudent.name}
           />
-          {activeView === 'projects' ? (
-            <ProjectManagement
-              studentId={currentStudent.rollNumber}
-              workspaceAction={workspaceAction}
-            />
-          ) : (
-            <>
-              <SubmissionCalendar events={submissionEvents} />
-            </>
-          )}
+
+          <SubmissionCalendar
+            events={submissionEvents}
+            title="Upcoming Deadlines"
+          />
+
+          <ProjectManagement
+            studentId={currentStudent.rollNumber}
+            workspaceAction={workspaceAction}
+          />
         </main>
       </div>
     </div>
