@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Captcha from '../components/shared/Captcha';
 import '../styles/auth.css';
 
 function Login() {
@@ -14,6 +15,8 @@ function Login() {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [captchaVerified, setCaptchaVerified] = useState(false);
+  const [otpTimeLeft, setOtpTimeLeft] = useState(0);
   const { login, verifyOtp, resendOtp, forgotPassword } = useAuth();
   const navigate = useNavigate();
 
@@ -23,6 +26,32 @@ function Login() {
     const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
     return () => clearTimeout(timer);
   }, [resendCooldown]);
+
+  useEffect(() => {
+    if (!otpSession?.expiresAt) {
+      setOtpTimeLeft(0);
+      return;
+    }
+
+    const tick = () => {
+      const seconds = Math.max(0, Math.ceil((otpSession.expiresAt - Date.now()) / 1000));
+      setOtpTimeLeft(seconds);
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [otpSession]);
+
+  const formatSeconds = (totalSeconds) => {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
+
+  const otpProgressPercent = otpSession
+    ? Math.max(0, Math.min(100, Math.round((otpTimeLeft / 300) * 100)))
+    : 0;
 
   const routeByRole = (role) => {
     if (role === 'admin') navigate('/admin');
@@ -36,6 +65,12 @@ function Login() {
     setResetMessage('');
     setShowForgotPassword(false);
 
+    // CAPTCHA is required for all roles before credential login.
+    if (!otpSession && !captchaVerified) {
+      setError('Please verify CAPTCHA first');
+      return;
+    }
+
     try {
       if (otpSession) {
         const verifiedUser = verifyOtp(otpSession.otpSessionId, otpCode);
@@ -48,15 +83,18 @@ function Login() {
       if (loggedInUser.requiresOtp) {
         setOtpSession(loggedInUser);
         setOtpCode('');
+        setCaptchaVerified(false);
         return;
       }
 
       routeByRole(loggedInUser.role);
+      setCaptchaVerified(false);
     } catch (loginError) {
       setError(loginError.message);
       if (!otpSession) {
         setShowForgotPassword(true);
       }
+      setCaptchaVerified(false);
     }
   };
 
@@ -75,6 +113,7 @@ function Login() {
   const resetOtpStep = () => {
     setOtpSession(null);
     setOtpCode('');
+    setOtpTimeLeft(0);
     setError('');
     setShowForgotPassword(false);
   };
@@ -83,7 +122,12 @@ function Login() {
     setResendLoading(true);
     setResendSuccess(false);
     try {
-      await resendOtp(otpSession.otpSessionId);
+      const resendResult = await resendOtp(otpSession.otpSessionId);
+      setOtpSession((prev) => ({
+        ...prev,
+        demoOtp: resendResult.demoOtp,
+        expiresAt: resendResult.expiresAt
+      }));
       setResendSuccess(true);
       setResendCooldown(30); // 30 second cooldown
       setTimeout(() => setResendSuccess(false), 3000); // Hide success message after 3s
@@ -121,6 +165,14 @@ function Login() {
               inputMode="numeric"
               required
             />
+            <p className={`otp-expiry ${otpTimeLeft === 0 ? 'otp-expired' : ''}`}>
+              {otpTimeLeft > 0
+                ? `OTP expires in ${formatSeconds(otpTimeLeft)}`
+                : 'OTP expired. Please resend OTP.'}
+            </p>
+            <div className="otp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={otpProgressPercent}>
+              <div className={`otp-progress-fill ${otpTimeLeft === 0 ? 'otp-progress-expired' : ''}`} style={{ width: `${otpProgressPercent}%` }} />
+            </div>
             <p className="otp-demo">For demo: OTP is {otpSession.demoOtp}</p>
           </>
         ) : (
@@ -131,7 +183,10 @@ function Login() {
               type="text"
               placeholder="Enter roll number, faculty email, or admin id"
               value={identifier}
-              onChange={(event) => setIdentifier(event.target.value)}
+              onChange={(event) => {
+                setIdentifier(event.target.value);
+                setCaptchaVerified(false);
+              }}
               required
             />
 
@@ -141,9 +196,14 @@ function Login() {
               type="password"
               placeholder="Password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setCaptchaVerified(false);
+              }}
               required
             />
+
+            <Captcha onVerify={setCaptchaVerified} />
           </>
         )}
 
@@ -161,7 +221,11 @@ function Login() {
 
         {resendSuccess ? <p className="success-message">OTP resent successfully.</p> : null}
 
-        <button type="submit" className="btn auth-submit">
+        <button
+          type="submit"
+          className="btn auth-submit"
+          disabled={Boolean(otpSession) && otpTimeLeft === 0}
+        >
           {otpSession ? 'Verify OTP' : 'Sign In'}
         </button>
 

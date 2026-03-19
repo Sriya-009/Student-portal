@@ -17,6 +17,7 @@ function fromDateKey(dateKey) {
 function SubmissionCalendar({
   events,
   title = 'Calendar',
+  showCourseFilter = true,
   canCreateEvents = false,
   canExtendDeadlines = false
 }) {
@@ -44,11 +45,14 @@ function SubmissionCalendar({
   }, [calendarEvents]);
 
   const filteredEvents = useMemo(() => {
+    if (!showCourseFilter) {
+      return calendarEvents;
+    }
     if (activeCourse === 'All courses') {
       return calendarEvents;
     }
     return calendarEvents.filter((event) => event.course === activeCourse || event.course === 'All courses');
-  }, [activeCourse, calendarEvents]);
+  }, [activeCourse, calendarEvents, showCourseFilter]);
 
   const eventsByDay = useMemo(() => {
     return filteredEvents.reduce((accumulator, event) => {
@@ -145,16 +149,18 @@ function SubmissionCalendar({
       </div>
 
       <div className="calendar-actions">
-        <select
-          className="calendar-course-select"
-          value={activeCourse}
-          onChange={(event) => setActiveCourse(event.target.value)}
-          aria-label="Filter by course"
-        >
-          {courses.map((course) => (
-            <option key={course} value={course}>{course}</option>
-          ))}
-        </select>
+        {showCourseFilter ? (
+          <select
+            className="calendar-course-select"
+            value={activeCourse}
+            onChange={(event) => setActiveCourse(event.target.value)}
+            aria-label="Filter by course"
+          >
+            {courses.map((course) => (
+              <option key={course} value={course}>{course}</option>
+            ))}
+          </select>
+        ) : null}
         {canCreateEvents ? (
           <button type="button" className="calendar-add-btn" onClick={() => setIsCreateOpen((prev) => !prev)}>
             {isCreateOpen ? 'Close' : 'New event'}

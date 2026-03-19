@@ -69,6 +69,7 @@ function StudentDashboard() {
           <SubmissionCalendar
             events={submissionEvents}
             title="Upcoming Deadlines"
+            showCourseFilter={false}
           />
 
           <ProjectManagement

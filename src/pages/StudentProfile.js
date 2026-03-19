@@ -9,7 +9,6 @@ function StudentProfile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
-  const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [formData, setFormData] = useState({});
   const [updateReason, setUpdateReason] = useState('');
   const [submitMessage, setSubmitMessage] = useState('');
@@ -52,7 +51,6 @@ function StudentProfile() {
 
     alert('✓ Profile update request submitted! Awaiting admin approval.');
     setSubmitMessage('✓ Your profile update request has been submitted successfully. You will be notified once the admin reviews it.');
-    setShowSubmitForm(false);
     setUpdateReason('');
     setIsEditing(false);
   };

@@ -6,9 +6,22 @@ const users = [
 ];
 
 const otpSessions = new Map();
+const lastIssuedOtpByUser = new Map();
 
 function generateOtpCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function issueUniqueOtp(userKey, previousOtp = '') {
+  let otpCode = generateOtpCode();
+  const lastIssued = lastIssuedOtpByUser.get(userKey);
+
+  while (otpCode === previousOtp || otpCode === lastIssued) {
+    otpCode = generateOtpCode();
+  }
+
+  lastIssuedOtpByUser.set(userKey, otpCode);
+  return otpCode;
 }
 
 function maskPhone(phoneNumber) {
@@ -50,15 +63,25 @@ export function loginUser(identifier, password) {
   if (facultyCredential) {
     const mentor = mentors.find((item) => item.id === facultyCredential.facultyId);
     if (mentor) {
-      return {
-        id: mentor.id,
-        name: mentor.name,
-        email: mentor.email,
+      const userKey = `faculty-${mentor.id}`;
+      const otpCode = issueUniqueOtp(userKey);
+      const otpSessionId = `otp-faculty-${mentor.id}-${Date.now()}`;
+      
+      otpSessions.set(otpSessionId, {
+        userId: mentor.id,
         role: 'faculty',
-        facultyId: mentor.id,
-        department: mentor.department,
-        specialization: mentor.specialization,
-        initials: mentor.initials
+        userKey,
+        otpCode,
+        expiresAt: Date.now() + (5 * 60 * 1000)
+      });
+
+      return {
+        requiresOtp: true,
+        otpSessionId,
+        maskedPhone: maskPhone(mentor.phoneNumber || mentor.phone || ''),
+        role: 'faculty',
+        demoOtp: otpCode,
+        expiresAt: otpSessions.get(otpSessionId).expiresAt
       };
     }
   }
@@ -69,11 +92,14 @@ export function loginUser(identifier, password) {
   );
 
   if (staffUser) {
-    const otpCode = generateOtpCode();
+    const userKey = `staff-${staffUser.id}`;
+    const otpCode = issueUniqueOtp(userKey);
     const otpSessionId = `otp-${staffUser.id}-${Date.now()}`;
 
     otpSessions.set(otpSessionId, {
       userId: staffUser.id,
+      role: staffUser.role,
+      userKey,
       otpCode,
       expiresAt: Date.now() + (5 * 60 * 1000)
     });
@@ -83,7 +109,8 @@ export function loginUser(identifier, password) {
       otpSessionId,
       maskedPhone: maskPhone(staffUser.phone),
       role: staffUser.role,
-      demoOtp: otpCode
+      demoOtp: otpCode,
+      expiresAt: otpSessions.get(otpSessionId).expiresAt
     };
   }
 
@@ -108,6 +135,25 @@ export function verifyStaffOtp(otpSessionId, otpCode) {
 
   otpSessions.delete(otpSessionId);
 
+  // Handle faculty OTP verification
+  if (session.role === 'faculty') {
+    const mentor = mentors.find((item) => item.id === session.userId);
+    if (!mentor) {
+      throw new Error('Faculty not found. Please login again.');
+    }
+    return {
+      id: mentor.id,
+      name: mentor.name,
+      email: mentor.email,
+      role: 'faculty',
+      facultyId: mentor.id,
+      department: mentor.department,
+      specialization: mentor.specialization,
+      initials: mentor.initials
+    };
+  }
+
+  // Handle admin/staff OTP verification
   const staffUser = users.find((item) => item.id === session.userId);
 
   if (!staffUser) {
@@ -143,7 +189,8 @@ export function resendOtp(otpSessionId) {
     throw new Error(`Please wait ${secondsRemaining} seconds before requesting another OTP.`);
   }
 
-  const newOtpCode = generateOtpCode();
+  const userKey = session.userKey || `${session.role || 'staff'}-${session.userId}`;
+  const newOtpCode = issueUniqueOtp(userKey, session.otpCode);
 
   session.otpCode = newOtpCode;
   session.expiresAt = Date.now() + (5 * 60 * 1000);
@@ -151,6 +198,22 @@ export function resendOtp(otpSessionId) {
   session.lastResendTime = Date.now();
 
   otpSessions.set(otpSessionId, session);
+
+  if (session.role === 'faculty') {
+    const mentor = mentors.find((item) => item.id === session.userId);
+    if (!mentor) {
+      throw new Error('User not found for this session.');
+    }
+
+    return {
+      otpSent: true,
+      maskedPhone: maskPhone(mentor.phoneNumber || mentor.phone || ''),
+      demoOtp: newOtpCode,
+      expiresAt: session.expiresAt,
+      resendCount: session.resendCount,
+      remainingAttempts: 3 - session.resendCount
+    };
+  }
 
   const staffUser = users.find((item) => item.id === session.userId);
   if (!staffUser) {
@@ -161,6 +224,7 @@ export function resendOtp(otpSessionId) {
     otpSent: true,
     maskedPhone: maskPhone(staffUser.phone),
     demoOtp: newOtpCode,
+    expiresAt: session.expiresAt,
     resendCount: session.resendCount,
     remainingAttempts: 3 - session.resendCount
   };

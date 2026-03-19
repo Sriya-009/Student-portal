@@ -153,6 +153,36 @@
   font-size: 15px;
 }
 
+.otp-expiry {
+  margin: 2px 0 0;
+  text-align: center;
+  color: #1d4ed8;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.otp-expired {
+  color: #b91c1c;
+}
+
+.otp-progress {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  overflow: hidden;
+}
+
+.otp-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1d4ed8, #3b82f6);
+  transition: width 0.8s linear;
+}
+
+.otp-progress-expired {
+  background: #dc2626;
+}
+
 .error {
   color: #b91c1c;
   margin: 0;
@@ -218,6 +248,98 @@
   cursor: not-allowed;
 }
 
+/* CAPTCHA Styles */
+.captcha-container {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 8px 0;
+  display: grid;
+  gap: 10px;
+}
+
+.captcha-container label {
+  font-size: 17px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.captcha-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.captcha-code {
+  flex: 1;
+}
+
+.captcha-refresh {
+  padding: 10px 14px;
+  font-size: 18px;
+  background: #f0f0f0;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
+  min-width: auto;
+  height: auto;
+}
+
+.captcha-refresh:hover {
+  background: #e5e7eb;
+}
+
+.captcha-container input {
+  inline-size: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+.captcha-verify {
+  background: #3b82f6;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.captcha-verify:hover {
+  background: #2563eb;
+}
+
+.captcha-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 14px;
+}
+
+body.dark-mode .captcha-container {
+  background: #1e293b;
+  border: 1px solid #475569;
+}
+
+body.dark-mode .captcha-container label {
+  color: #e2e8f0;
+}
+
+body.dark-mode .captcha-code {
+  background: #334155 !important;
+  color: #e2e8f0;
+}
+
+body.dark-mode .captcha-refresh {
+  background: #334155;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+body.dark-mode .captcha-container input {
+  background: #334155;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
 body.dark-mode .success-message {
   color: #22c55e;
 }
@@ -245,6 +367,26 @@ body.dark-mode .auth-form h2,
 body.dark-mode .auth-subtext,
 body.dark-mode .auth-form label {
   color: #e2e8f0;
+}
+
+body.dark-mode .otp-expiry {
+  color: #93c5fd;
+}
+
+body.dark-mode .otp-expired {
+  color: #fca5a5;
+}
+
+body.dark-mode .otp-progress {
+  background: #334155;
+}
+
+body.dark-mode .otp-progress-fill {
+  background: linear-gradient(90deg, #60a5fa, #93c5fd);
+}
+
+body.dark-mode .otp-progress-expired {
+  background: #ef4444;
 }
 
 body.dark-mode .auth-logo {

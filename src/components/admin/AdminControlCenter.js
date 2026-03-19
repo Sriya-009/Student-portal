@@ -62,10 +62,52 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
       return;
     }
 
-    const exists = users.some((user) => user.id.toLowerCase() === newUser.id.trim().toLowerCase());
-    if (exists) {
+    // Check for duplicate user ID
+    const idExists = users.some((user) => user.id.toLowerCase() === newUser.id.trim().toLowerCase());
+    if (idExists) {
       alert('User ID already exists. Use a unique ID.');
       return;
+    }
+
+    // Check for duplicate email
+    const emailExists = users.some((user) => user.email.toLowerCase() === newUser.email.trim().toLowerCase());
+    if (emailExists) {
+      alert('Email already exists. Use a unique email address.');
+      return;
+    }
+
+    // For students, validate rollNumber format
+    if (newUser.role === 'student') {
+      if (!newUser.id.match(/^STU\d{3}$/i)) {
+        alert('Student ID must follow format: STU001 (STU + 3 digits)');
+        return;
+      }
+      
+      // Check for duplicate student ID in students list
+      const studentExists = users.filter(u => u.role === 'student').some(
+        (user) => user.id.toLowerCase() === newUser.id.trim().toLowerCase()
+      );
+      if (studentExists) {
+        alert('Student roll number already exists in the system.');
+        return;
+      }
+    }
+
+    // For faculty, validate faculty ID format
+    if (newUser.role === 'faculty') {
+      if (!newUser.id.match(/^(MENTOR|FAC|FACULTY)-\d{3}$/i)) {
+        alert('Faculty ID must follow format: MENTOR-001 or FAC-001');
+        return;
+      }
+
+      // Check for duplicate faculty ID
+      const facultyExists = users.filter(u => u.role === 'faculty').some(
+        (user) => user.id.toLowerCase() === newUser.id.trim().toLowerCase()
+      );
+      if (facultyExists) {
+        alert('Faculty ID already exists in the system.');
+        return;
+      }
     }
 
     const createdUser = {
@@ -79,7 +121,7 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
 
     setUsers((prev) => [createdUser, ...prev]);
     setDbRecordCount((prev) => prev + 1);
-    addLog(`Registered user ${createdUser.id} (${createdUser.role})`);
+    addLog(`Registered user ${createdUser.id} (${createdUser.role}) - Duplicate prevention checks passed`);
     setNewUser({ id: '', name: '', email: '', department: '', role: 'student' });
   };
 

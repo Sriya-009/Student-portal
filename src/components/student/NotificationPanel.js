@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { getPendingNotifications, markEventAsNotified } from '../../services/notificationService';
 import '../../styles/notifications.css';
 
@@ -24,19 +24,6 @@ function NotificationPanel({ events, studentId, phoneNumber, studentName }) {
 
     return () => clearInterval(interval);
   }, [events, studentId, dismissedIds]);
-
-  // Auto-dismiss and trigger SMS when notification appears
-  useEffect(() => {
-    notifications.forEach((notif) => {
-      // Mark as notified to prevent duplicate
-      markEventAsNotified(notif.eventKey, studentId);
-
-      // Send phone notification (mock - logs to console and localStorage)
-      if (phoneNumber) {
-        sendPhoneNotification(phoneNumber, notif, studentName);
-      }
-    });
-  }, [notifications, studentId, phoneNumber, studentName]);
 
   const handleDismiss = (notificationId) => {
     setDismissedIds((prev) => [...prev, notificationId]);
@@ -64,6 +51,72 @@ function NotificationPanel({ events, studentId, phoneNumber, studentName }) {
     if (logs.length > 20) logs.shift();
     localStorage.setItem('portal-sms-logs', JSON.stringify(logs));
   };
+
+  // Helper function to display browser notification
+  const showBrowserNotification = useCallback((notification, name) => {
+    const browserNotif = new Notification('Deadline Alert!', {
+      body: `Hi ${name}, your ${notification.type} "${notification.title}" is due in ${notification.timeRemaining}. Please submit before the deadline.`,
+      icon: '🔔',
+      badge: '📚',
+      tag: `deadline-${notification.id}`,
+      requireInteraction: true
+    });
+
+    // Auto close after 10 seconds
+    setTimeout(() => browserNotif.close(), 10000);
+
+    // Log browser notification
+    console.log(`🔔 Browser notification sent: ${notification.title}`);
+    const notifLogs = JSON.parse(localStorage.getItem('portal-browser-notifications') || '[]');
+    notifLogs.push({
+      timestamp: new Date().toISOString(),
+      title: notification.title,
+      type: notification.type,
+      timeRemaining: notification.timeRemaining
+    });
+    if (notifLogs.length > 20) notifLogs.shift();
+    localStorage.setItem('portal-browser-notifications', JSON.stringify(notifLogs));
+  }, []);
+
+  // Browser notification function
+  const sendBrowserNotification = useCallback((notification, name) => {
+    // Check if browser supports notifications
+    if (!('Notification' in window)) {
+      console.log('Browser notifications not supported');
+      return;
+    }
+
+    // Request permission if not already granted
+    if (Notification.permission === 'granted') {
+      showBrowserNotification(notification, name);
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission((permission) => {
+        if (permission === 'granted') {
+          showBrowserNotification(notification, name);
+        }
+      });
+    }
+  }, [showBrowserNotification]);
+
+  // Auto-dismiss and trigger SMS + Browser Notifications when notification appears
+  useEffect(() => {
+    const handleNotifications = () => {
+      notifications.forEach((notif) => {
+        // Mark as notified to prevent duplicate
+        markEventAsNotified(notif.eventKey, studentId);
+
+        // Send phone notification (mock - logs to console and localStorage)
+        if (phoneNumber) {
+          sendPhoneNotification(phoneNumber, notif, studentName);
+        }
+
+        // Send browser notification
+        sendBrowserNotification(notif, studentName);
+      });
+    };
+
+    handleNotifications();
+  }, [notifications, studentId, phoneNumber, studentName, sendBrowserNotification]);
 
   if (notifications.length === 0) return null;
 
@@ -118,6 +171,7 @@ function NotificationPanel({ events, studentId, phoneNumber, studentName }) {
 
       <div className="notification-footer">
         <p className="notification-phone">📱 SMS notifications sent to: {phoneNumber}</p>
+        <p className="notification-browser">🔔 Browser notifications enabled for this browser</p>
       </div>
     </div>
   );

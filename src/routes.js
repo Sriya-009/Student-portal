@@ -5,6 +5,8 @@ import Signup from './pages/Signup';
 import AdminDashboard from './pages/AdminDashboard';
 import FacultyDashboard from './pages/FacultyDashboard';
 import StudentDashboard from './pages/StudentDashboard';
+import StudentProfile from './pages/StudentProfile';
+import FacultyProfile from './pages/FacultyProfile';
 import AssignTasks from './pages/AssignTasks';
 import UploadFiles from './pages/UploadFiles';
 import Progress from './pages/Progress';
@@ -27,9 +29,11 @@ function AppRoutes() {
 
       <Route element={<PrivateRoute allowedRoles={['student']} />}>
         <Route path="/student" element={<StudentDashboard />} />
+        <Route path="/student/profile" element={<StudentProfile />} />
       </Route>
 
       <Route element={<PrivateRoute allowedRoles={['faculty']} />}>
+        <Route path="/faculty/profile" element={<FacultyProfile />} />
         <Route path="/assign-tasks" element={<AssignTasks />} />
         <Route path="/upload-files" element={<UploadFiles />} />
       </Route>
