@@ -1,151 +1,215 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
-function FinalActionsPanel({ projects }) {
+function FinalActionsPanel({ projects, grades }) {
+  const [projectsState, setProjectsState] = useState(projects);
+  const [completedProjects, setCompletedProjects] = useState(new Set());
+  const [archivedProjects, setArchivedProjects] = useState(new Set());
+  const [confirmAction, setConfirmAction] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
 
+  const completedCount = useMemo(
+    () => completedProjects.size,
+    [completedProjects]
+  );
+
+  const archivedCount = useMemo(
+    () => archivedProjects.size,
+    [archivedProjects]
+  );
+
   const handleMarkComplete = (projectId) => {
-    alert(`✓ Project ${projectId} marked as completed!`);
+    setConfirmAction({ type: 'complete', projectId });
+  };
+
+  const confirmMarkComplete = () => {
+    if (!confirmAction || !confirmAction.projectId) return;
+
+    const updatedProjects = projectsState.map((p) =>
+      p.id === confirmAction.projectId
+        ? { ...p, status: 'completed', completionDate: new Date().toISOString().split('T')[0] }
+        : p
+    );
+
+    setProjectsState(updatedProjects);
+    setCompletedProjects(new Set(completedProjects).add(confirmAction.projectId));
+    alert(`✓ Project marked as completed!`);
+    setConfirmAction(null);
   };
 
   const handleArchive = (projectId) => {
-    alert(`📦 Project ${projectId} archived successfully!`);
+    setConfirmAction({ type: 'archive', projectId });
+  };
+
+  const confirmArchive = () => {
+    if (!confirmAction || !confirmAction.projectId) return;
+
+    const updatedProjects = projectsState.map((p) =>
+      p.id === confirmAction.projectId ? { ...p, isArchived: true } : p
+    );
+
+    setProjectsState(updatedProjects);
+    setArchivedProjects(new Set(archivedProjects).add(confirmAction.projectId));
+    alert(`✓ Project archived successfully!`);
+    setConfirmAction(null);
   };
 
   const handlePublishResults = () => {
-    alert('✓ Results published to students!');
+    const completedProj = projectsState.filter((p) => p.status === 'completed').length;
+    if (completedProj === 0) {
+      alert('No completed projects to publish');
+      return;
+    }
+
+    alert(`✓ Results published to ${completedProj} students!`);
   };
 
-  const ongoingProjects = projects.filter((p) => p.status === 'ongoing');
+  const handleCleanup = () => {
+    const totalProjects = projectsState.length;
+    const cleanedProjects = projectsState.filter((p) => p.isArchived).length;
+
+    alert(`Database Cleanup Report:\n- Total Projects: ${totalProjects}\n- Cleaned (Archived): ${cleanedProjects}`);
+  };
+
+  const handleFinalReview = () => {
+    const total = projectsState.length;
+    const completed = completedCount;
+    const archived = archivedCount;
+    const pending = total - completed;
+
+    alert(
+      `Final Review Summary:\n` +
+      `─────────────────────\n` +
+      `Total Projects: ${total}\n` +
+      `Completed: ${completed}\n` +
+      `Archived: ${archived}\n` +
+      `Pending: ${pending}`
+    );
+  };
+
+  const cancelConfirmation = () => {
+    setConfirmAction(null);
+    setSelectedProject(null);
+  };
+
+  const incompleteProjects = projectsState.filter((p) => p.status !== 'completed' && !archivedProjects.has(p.id));
 
   return (
     <section className="faculty-panel final-actions-panel">
       <div className="panel-grid">
         <div className="stat-card">
           <h3>Total Projects</h3>
-          <p className="stat-value">{projects.length}</p>
+          <p className="stat-value">{projectsState.length}</p>
         </div>
         <div className="stat-card">
-          <h3>Active Projects</h3>
-          <p className="stat-value">{ongoingProjects.length}</p>
+          <h3>Completed</h3>
+          <p className="stat-value">{completedCount}</p>
         </div>
         <div className="stat-card">
-          <h3>Ready for Archive</h3>
-          <p className="stat-value">{projects.filter((p) => p.progressPercent >= 100).length}</p>
+          <h3>Archived</h3>
+          <p className="stat-value">{archivedCount}</p>
+        </div>
+        <div className="stat-card">
+          <h3>Pending</h3>
+          <p className="stat-value">{projectsState.length - completedCount - archivedCount}</p>
         </div>
       </div>
 
       <div className="panel-content">
-        <h3>Project Completion & Archival</h3>
-
-        <div className="final-actions-list">
-          {ongoingProjects.map((project) => (
-            <div key={project.id} className="final-action-card">
-              <div className="project-info">
-                <h4>{project.name}</h4>
-                <p>{project.description}</p>
-                <div className="project-meta">
-                  <span>Progress: <strong>{project.progressPercent}%</strong></span>
-                  <span>Team: <strong>{project.teamMemberIds.length}</strong></span>
-                  <span>Deadline: <strong>{project.deadline}</strong></span>
-                </div>
-              </div>
-
-              <div className="action-buttons">
-                {project.progressPercent >= 100 ? (
-                  <>
+        <div className="action-grid">
+          <div className="action-section">
+            <h3>Complete Projects</h3>
+            <div className="project-list">
+              {incompleteProjects.length === 0 ? (
+                <p className="empty-state">All projects completed or archived</p>
+              ) : (
+                incompleteProjects.map((proj) => (
+                  <div key={proj.id} className="project-item">
+                    <div className="project-info">
+                      <strong>{proj.id}</strong>
+                      <p>{proj.title}</p>
+                      <p className="project-status">{proj.status}</p>
+                    </div>
                     <button
                       className="btn-success"
-                      onClick={() => handleMarkComplete(project.id)}
+                      onClick={() => {
+                        setSelectedProject(proj.id);
+                        handleMarkComplete(proj.id);
+                      }}
                     >
-                      ✓ Mark Complete
-                    </button>
-                    <button
-                      className="btn-primary"
-                      onClick={() => handleArchive(project.id)}
-                    >
-                      📦 Archive
-                    </button>
-                  </>
-                ) : (
-                  <p className="status-badge in-progress">In Progress - {project.progressPercent}%</p>
-                )}
-              </div>
-
-              {selectedProject === project.id && (
-                <div className="confirmation-box">
-                  <p>⚠️ Mark this project as completed?</p>
-                  <div className="confirm-buttons">
-                    <button className="btn-danger" onClick={() => {
-                      handleMarkComplete(project.id);
-                      setSelectedProject(null);
-                    }}>
-                      Yes, Complete
-                    </button>
-                    <button className="btn-secondary" onClick={() => setSelectedProject(null)}>
-                      Cancel
+                      Mark Complete
                     </button>
                   </div>
-                </div>
+                ))
               )}
             </div>
-          ))}
-        </div>
-
-        <h3 style={{ marginTop: '32px' }}>Results & Publishing</h3>
-        <div className="publishing-panel">
-          <div className="publish-card">
-            <h4>📊 Publish Grades & Results</h4>
-            <p>Make student grades and feedback visible to students</p>
-            <button className="btn-primary" onClick={handlePublishResults}>
-              🔓 Publish Results to Students
-            </button>
           </div>
 
-          <div className="publish-card">
-            <h4>📦 Archive Completed Projects</h4>
-            <p>Archive all completed projects to maintain records</p>
-            <button className="btn-primary">
-              📦 Archive All Completed
-            </button>
+          <div className="action-section">
+            <h3>Archive & Cleanup</h3>
+            <ul className="checklist">
+              <li>
+                <strong>Archive completed projects</strong>
+                <p>Move finalized projects to archive</p>
+              </li>
+              <li>
+                <strong>Cleanup old data</strong>
+                <p>Remove temporary records and cleanup</p>
+              </li>
+              <li>
+                <strong>Final review</strong>
+                <p>Review summary before publish</p>
+              </li>
+            </ul>
+
+            <div className="button-group">
+              <button className="btn-primary" onClick={() => handleArchive(selectedProject || projectsState[0]?.id)}>
+                Archive Projects
+              </button>
+              <button className="btn-secondary" onClick={handleCleanup}>
+                Cleanup
+              </button>
+              <button className="btn-info" onClick={handleFinalReview}>
+                Final Review
+              </button>
+            </div>
           </div>
 
-          <div className="publish-card">
-            <h4>🧹 Cleanup & Maintenance</h4>
-            <p>Remove temporary data and optimize storage</p>
-            <button className="btn-secondary">
-              🧹 Run Cleanup
-            </button>
-          </div>
-        </div>
-
-        <h3 style={{ marginTop: '32px' }}>Final Review Checklist</h3>
-        <div className="checklist">
-          <div className="checklist-item">
-            <input type="checkbox" id="c1" />
-            <label htmlFor="c1">✓ All grades assigned and reviewed</label>
-          </div>
-          <div className="checklist-item">
-            <input type="checkbox" id="c2" />
-            <label htmlFor="c2">✓ Feedback provided to all students</label>
-          </div>
-          <div className="checklist-item">
-            <input type="checkbox" id="c3" />
-            <label htmlFor="c3">✓ Final submissions verified</label>
-          </div>
-          <div className="checklist-item">
-            <input type="checkbox" id="c4" />
-            <label htmlFor="c4">✓ Reports generated and documented</label>
-          </div>
-          <div className="checklist-item">
-            <input type="checkbox" id="c5" />
-            <label htmlFor="c5">✓ Student notifications sent</label>
-          </div>
-          <div className="checklist-item">
-            <input type="checkbox" id="c6" />
-            <label htmlFor="c6">✓ Projects archived</label>
+          <div className="action-section">
+            <h3>Publish Results</h3>
+            <div className="publish-section">
+              <h4>Publish to Students</h4>
+              <p>Notify all students of their final grades and feedback</p>
+              <button className="btn-success" onClick={handlePublishResults}>
+                Publish Results
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {confirmAction && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Confirm Action</h3>
+            <p>
+              {confirmAction.type === 'complete'
+                ? 'Mark this project as completed? This action will update the project status.'
+                : 'Archive this project? Archived projects will be removed from active view.'}
+            </p>
+            <div className="button-group">
+              <button
+                className="btn-success"
+                onClick={confirmAction.type === 'complete' ? confirmMarkComplete : confirmArchive}
+              >
+                Confirm
+              </button>
+              <button className="btn-secondary" onClick={cancelConfirmation}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
