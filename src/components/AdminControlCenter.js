@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-function AdminControlCenter({ students, mentors, projects, projectProposals, files, submissionEvents }) {
+function AdminControlCenter({ students, mentors, projects, projectProposals, files, submissionEvents, activeSection, activeAction }) {
   const [users, setUsers] = useState(() => [
     ...students.map((student) => ({
       id: student.id,
@@ -271,6 +271,29 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
     alert(`${completedIds.length} completed projects archived.`);
   };
 
+  const section = activeSection || 'user-management';
+  const showUser = section === 'user-management';
+  const showSystem = section === 'system-management';
+  const showProject = section === 'project-management';
+  const showMonitoring = section === 'monitoring-control';
+  const showData = section === 'data-file-management';
+  const showReports = section === 'reports-analytics';
+  const showNotify = section === 'notifications-communication';
+  const showSecurity = section === 'security-management';
+  const showMaintenance = section === 'maintenance';
+  const showFinal = section === 'final-actions';
+
+  const userAction = activeAction && activeAction.startsWith('user-') ? activeAction : 'user-add-register';
+  const systemAction = activeAction && activeAction.startsWith('system-') ? activeAction : 'system-maintain';
+  const projectAction = activeAction && activeAction.startsWith('project-') ? activeAction : 'project-view-all';
+  const monitorAction = activeAction && activeAction.startsWith('monitor-') ? activeAction : 'monitor-track-activities';
+  const dataAction = activeAction && activeAction.startsWith('data-') ? activeAction : 'data-manage-files';
+  const reportAction = activeAction && activeAction.startsWith('report-') ? activeAction : 'report-generate';
+  const notifyAction = activeAction && activeAction.startsWith('notify-') ? activeAction : 'notify-announcements';
+  const securityAction = activeAction && activeAction.startsWith('security-') ? activeAction : 'security-auth';
+  const maintenanceAction = activeAction && activeAction.startsWith('maintenance-') ? activeAction : 'maintenance-fix-issues';
+  const finalAction = activeAction && activeAction.startsWith('final-') ? activeAction : 'final-archive-projects';
+
   return (
     <section className="faculty-panel admin-control-panel">
       <div className="panel-grid">
@@ -294,9 +317,10 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
 
       <div className="panel-content">
         <div className="admin-operations-grid">
-          <article className="admin-operation-card">
+          {showUser && (<article className="admin-operation-card">
             <h3>User Management</h3>
-            <div className="admin-form-grid">
+            <p className="muted-line">Mode: {userAction.replace('user-', '').replace('-', ' ')}</p>
+            {(userAction === 'user-add-register' || userAction === 'user-management-overview') && <div className="admin-form-grid">
               <input className="form-input" placeholder="ID" value={newUser.id} onChange={(e) => setNewUser({ ...newUser, id: e.target.value })} />
               <input className="form-input" placeholder="Name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
               <input className="form-input" placeholder="Email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
@@ -306,9 +330,9 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
                 <option value="faculty">Faculty</option>
               </select>
               <button className="btn-primary" onClick={handleAddUser}>Add/Register</button>
-            </div>
+            </div>}
 
-            <div className="admin-list">
+            {(userAction === 'user-approve-remove' || userAction === 'user-manage-roles' || userAction === 'user-management-overview') && <div className="admin-list">
               {users.slice(0, 6).map((user) => (
                 <div key={user.id} className="admin-list-item">
                   <div>
@@ -326,9 +350,9 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
                   </div>
                 </div>
               ))}
-            </div>
+            </div>}
 
-            {editUserId ? (
+            {(userAction === 'user-update-details' || editUserId) ? (
               <div className="admin-form-grid">
                 <input className="form-input" placeholder="Name" value={editUser.name} onChange={(e) => setEditUser({ ...editUser, name: e.target.value })} />
                 <input className="form-input" placeholder="Email" value={editUser.email} onChange={(e) => setEditUser({ ...editUser, email: e.target.value })} />
@@ -336,27 +360,29 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
                 <button className="btn-success" onClick={saveEditUser}>Update User Details</button>
               </div>
             ) : null}
-          </article>
+          </article>)}
 
-          <article className="admin-operation-card">
+          {showSystem && (<article className="admin-operation-card">
             <h3>System Management</h3>
+            <p className="muted-line">Mode: {systemAction.replace('system-', '').replace('-', ' ')}</p>
             <p>System Status: <strong>{systemHealthy ? 'Healthy' : 'Attention Required'}</strong></p>
             <p>Access Control: <strong>{accessControlEnabled ? 'Enabled' : 'Disabled'}</strong></p>
-            <div className="button-group">
+            {(systemAction === 'system-maintain' || systemAction === 'system-management-overview') && <div className="button-group">
               <button className="btn-secondary" onClick={() => setSystemHealthy((prev) => !prev)}>Maintain Functionality</button>
               <button className="btn-secondary" onClick={() => setAccessControlEnabled((prev) => !prev)}>Access Control</button>
-            </div>
-            <div className="button-group">
+            </div>}
+            {(systemAction === 'system-database' || systemAction === 'system-management-overview') && <div className="button-group">
               <button className="btn-primary" onClick={handleStoreData}>Store Data</button>
               <button className="btn-info" onClick={handleUpdateData}>Update Data</button>
               <button className="btn-danger" onClick={handleDeleteData}>Delete Data</button>
-            </div>
-          </article>
+            </div>}
+          </article>)}
 
-          <article className="admin-operation-card">
+          {showProject && (<article className="admin-operation-card">
             <h3>Project Management</h3>
+            <p className="muted-line">Mode: {projectAction.replace('project-', '').replace('-', ' ')}</p>
             <p>Pending Proposals: <strong>{pendingProposals.length}</strong></p>
-            <div className="admin-list">
+            {(projectAction === 'project-approve-reject' || projectAction === 'project-management-overview') && <div className="admin-list">
               {pendingProposals.slice(0, 4).map((proposal) => (
                 <div key={proposal.id} className="admin-list-item">
                   <div>
@@ -369,8 +395,8 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
                   </div>
                 </div>
               ))}
-            </div>
-            <div className="admin-form-grid">
+            </div>}
+            {(projectAction === 'project-assign-mentor' || projectAction === 'project-management-overview') && <div className="admin-form-grid">
               <select className="form-select" value={selectedProjectId} onChange={(e) => setSelectedProjectId(e.target.value)}>
                 <option value="">Select Project</option>
                 {projectsState.map((project) => <option key={project.id} value={project.id}>{project.id}</option>)}
@@ -380,12 +406,13 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
                 {mentors.map((mentor) => <option key={mentor.id} value={mentor.id}>{mentor.name}</option>)}
               </select>
               <button className="btn-primary" onClick={assignMentor}>Assign Mentor</button>
-            </div>
-            <p>Ongoing: <strong>{projectsState.filter((project) => project.status === 'ongoing').length}</strong> | Completed: <strong>{projectsState.filter((project) => project.status === 'completed').length}</strong></p>
-          </article>
+            </div>}
+            {(projectAction === 'project-view-all' || projectAction === 'project-monitor-status' || projectAction === 'project-management-overview') && <p>Ongoing: <strong>{projectsState.filter((project) => project.status === 'ongoing').length}</strong> | Completed: <strong>{projectsState.filter((project) => project.status === 'completed').length}</strong></p>}
+          </article>)}
 
-          <article className="admin-operation-card">
+          {showMonitoring && (<article className="admin-operation-card">
             <h3>Monitoring & Control</h3>
+            <p className="muted-line">Mode: {monitorAction.replace('monitor-', '').replace('-', ' ')}</p>
             <p>User Activity Logs: <strong>{activityLogs.length}</strong></p>
             <p>Deadlines due in 24h: <strong>{dueSoonCount}</strong></p>
             <div className="admin-log-list">
@@ -393,25 +420,27 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
                 <p key={log.id}><strong>{log.time}</strong> - {log.message}</p>
               ))}
             </div>
-          </article>
+          </article>)}
 
-          <article className="admin-operation-card">
+          {showData && (<article className="admin-operation-card">
             <h3>Data & File Management</h3>
+            <p className="muted-line">Mode: {dataAction.replace('data-', '').replace('-', ' ')}</p>
             <p>Uploaded Files: <strong>{files.length}</strong></p>
             <p>Project Records: <strong>{projectsState.length}</strong></p>
-            <div className="button-group">
+            {(dataAction === 'data-backup-restore' || dataAction === 'data-file-management-overview') && <div className="button-group">
               <button className="btn-primary" onClick={handleCreateBackup}>Backup Data</button>
               <button className="btn-secondary" onClick={handleRestoreBackup}>Restore Data</button>
-            </div>
+            </div>}
             <div className="admin-log-list">
               {backupHistory.slice(0, 4).map((backup) => (
                 <p key={backup.id}><strong>{backup.createdAt}</strong> - {backup.records} records</p>
               ))}
             </div>
-          </article>
+          </article>)}
 
-          <article className="admin-operation-card">
+          {showReports && (<article className="admin-operation-card">
             <h3>Reports & Analytics</h3>
+            <p className="muted-line">Mode: {reportAction.replace('report-', '').replace('-', ' ')}</p>
             <p>System-wide report includes users, projects, and deadlines.</p>
             <p>Completion Rate: <strong>{completionRate}%</strong></p>
             <p>Pending Work: <strong>{projectsState.filter((project) => project.status !== 'completed').length}</strong> projects</p>
@@ -421,10 +450,11 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
             }}>
               Generate Report
             </button>
-          </article>
+          </article>)}
 
-          <article className="admin-operation-card">
+          {showNotify && (<article className="admin-operation-card">
             <h3>Notifications & Communication</h3>
+            <p className="muted-line">Mode: {notifyAction.replace('notify-', '').replace('-', ' ')}</p>
             <textarea
               className="form-textarea"
               rows="3"
@@ -433,15 +463,19 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
               onChange={(e) => setAnnouncementText(e.target.value)}
             />
             <button className="btn-primary" onClick={sendAnnouncement}>Send Announcement</button>
+            {notifyAction === 'notify-deadlines' && (
+              <p className="muted-line">{dueSoonCount} deadlines are due in the next 24 hours. Send an update to all users.</p>
+            )}
             <div className="admin-log-list">
               {announcements.slice(0, 4).map((announcement) => (
                 <p key={announcement.id}><strong>{announcement.sentAt}</strong> - {announcement.message}</p>
               ))}
             </div>
-          </article>
+          </article>)}
 
-          <article className="admin-operation-card">
+          {showSecurity && (<article className="admin-operation-card">
             <h3>Security Management</h3>
+            <p className="muted-line">Mode: {securityAction.replace('security-', '').replace('-', ' ')}</p>
             <p>Authentication: <strong>{securityState.authEnabled ? 'Enabled' : 'Disabled'}</strong></p>
             <p>Permission Policy: <strong>{securityState.strictPermissions ? 'Strict' : 'Standard'}</strong></p>
             <div className="button-group">
@@ -450,29 +484,34 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
             </div>
             <button className="btn-info" onClick={runSecurityAudit}>Run Privacy Audit</button>
             {securityState.lastAudit ? <p>Last Audit: <strong>{securityState.lastAudit}</strong></p> : null}
-          </article>
+          </article>)}
 
-          <article className="admin-operation-card">
+          {showMaintenance && (<article className="admin-operation-card">
             <h3>Maintenance</h3>
+            <p className="muted-line">Mode: {maintenanceAction.replace('maintenance-', '').replace('-', ' ')}</p>
             <input className="form-input" placeholder="Log system issue" value={issueText} onChange={(e) => setIssueText(e.target.value)} />
             <button className="btn-danger" onClick={logMaintenanceIssue}>Fix System Issue</button>
             <input className="form-input" placeholder="Feature update notes" value={featureText} onChange={(e) => setFeatureText(e.target.value)} />
             <button className="btn-primary" onClick={logFeatureUpdate}>Update Feature</button>
+            {maintenanceAction === 'maintenance-smooth-performance' && (
+              <button className="btn-secondary" onClick={() => addLog('Performance check completed: system running smoothly')}>Run Performance Check</button>
+            )}
             <div className="admin-log-list">
               {maintenanceHistory.slice(0, 4).map((entry) => (
                 <p key={entry.id}><strong>{entry.type}</strong> - {entry.text}</p>
               ))}
             </div>
-          </article>
+          </article>)}
 
-          <article className="admin-operation-card">
+          {showFinal && (<article className="admin-operation-card">
             <h3>Final Actions</h3>
+            <p className="muted-line">Mode: {finalAction.replace('final-', '').replace('-', ' ')}</p>
             <p>Archived Projects: <strong>{archivedProjectIds.size}</strong></p>
             <p>Operation Logs: <strong>{activityLogs.length}</strong></p>
-            <button className="btn-secondary" onClick={archiveCompletedProjects}>Archive Completed Projects</button>
-            <button className="btn-info" onClick={() => alert('History maintained and system operations reviewed.')}>Maintain History</button>
-            <button className="btn-primary" onClick={() => addLog('Completed overall system operations review')}>Oversee Operations</button>
-          </article>
+            {(finalAction === 'final-archive-projects' || finalAction === 'final-actions-overview') && <button className="btn-secondary" onClick={archiveCompletedProjects}>Archive Completed Projects</button>}
+            {(finalAction === 'final-maintain-history' || finalAction === 'final-actions-overview') && <button className="btn-info" onClick={() => alert('History maintained and system operations reviewed.')}>Maintain History</button>}
+            {(finalAction === 'final-oversee-operations' || finalAction === 'final-actions-overview') && <button className="btn-primary" onClick={() => addLog('Completed overall system operations review')}>Oversee Operations</button>}
+          </article>)}
         </div>
       </div>
     </section>
