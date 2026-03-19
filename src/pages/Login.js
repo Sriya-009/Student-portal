@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import '../styles/auth.css';
@@ -9,8 +9,18 @@ function Login() {
   const [otpCode, setOtpCode] = useState('');
   const [otpSession, setOtpSession] = useState(null);
   const [error, setError] = useState('');
-  const { login, verifyOtp } = useAuth();
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const { login, verifyOtp, resendOtp } = useAuth();
   const navigate = useNavigate();
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
 
   const routeByRole = (role) => {
     if (role === 'admin') navigate('/admin');
@@ -47,6 +57,21 @@ function Login() {
     setOtpSession(null);
     setOtpCode('');
     setError('');
+  };
+
+  const handleResendOtp = async () => {
+    setResendLoading(true);
+    setResendSuccess(false);
+    try {
+      await resendOtp(otpSession.otpSessionId);
+      setResendSuccess(true);
+      setResendCooldown(30); // 30 second cooldown
+      setTimeout(() => setResendSuccess(false), 3000); // Hide success message after 3s
+    } catch (err) {
+      setError(err.message || 'Failed to resend OTP');
+    } finally {
+      setResendLoading(false);
+    }
   };
 
   return (
@@ -111,6 +136,20 @@ function Login() {
           <button type="button" className="btn secondary-btn" onClick={resetOtpStep}>
             Use Different Credentials
           </button>
+        ) : null}
+
+        {otpSession ? (
+          <div className="resend-otp-section">
+            {resendSuccess && <p className="success-message">✓ OTP resent successfully!</p>}
+            <button
+              type="button"
+              className="btn secondary-btn resend-btn"
+              onClick={handleResendOtp}
+              disabled={resendCooldown > 0 || resendLoading}
+            >
+              {resendLoading ? 'Sending...' : resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
+            </button>
+          </div>
         ) : null}
 
         <div className="demo-box">

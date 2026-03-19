@@ -122,6 +122,50 @@ export function verifyStaffOtp(otpSessionId, otpCode) {
   };
 }
 
+export function resendOtp(otpSessionId) {
+  const session = otpSessions.get(otpSessionId);
+
+  if (!session) {
+    throw new Error('OTP session expired. Please login again with credentials.');
+  }
+
+  if (!session.resendCount) {
+    session.resendCount = 0;
+  }
+
+  if (session.resendCount >= 3) {
+    throw new Error('Maximum resend attempts reached. Please login again.');
+  }
+
+  const now = Date.now();
+  if (session.lastResendTime && now - session.lastResendTime < 30000) {
+    const secondsRemaining = Math.ceil((30000 - (now - session.lastResendTime)) / 1000);
+    throw new Error(`Please wait ${secondsRemaining} seconds before requesting another OTP.`);
+  }
+
+  const newOtpCode = generateOtpCode();
+
+  session.otpCode = newOtpCode;
+  session.expiresAt = Date.now() + (5 * 60 * 1000);
+  session.resendCount += 1;
+  session.lastResendTime = Date.now();
+
+  otpSessions.set(otpSessionId, session);
+
+  const staffUser = users.find((item) => item.id === session.userId);
+  if (!staffUser) {
+    throw new Error('User not found for this session.');
+  }
+
+  return {
+    otpSent: true,
+    maskedPhone: maskPhone(staffUser.phone),
+    demoOtp: newOtpCode,
+    resendCount: session.resendCount,
+    remainingAttempts: 3 - session.resendCount
+  };
+}
+
 export function signupUser(name, email, password, role = 'student') {
   if (role === 'student') {
     const nextId = students.length + 1;

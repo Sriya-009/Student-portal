@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, useState } from 'react';
-import { loginUser, signupUser, verifyStaffOtp } from '../services/authService';
+import { loginUser, signupUser, verifyStaffOtp, resendOtp } from '../services/authService';
 
 const AuthContext = createContext(null);
 
@@ -31,11 +31,16 @@ export function AuthProvider({ children }) {
 
   const logout = () => setUser(null);
 
+  const resend = (otpSessionId) => {
+    return resendOtp(otpSessionId);
+  };
+
   const value = useMemo(
     () => ({
       user,
       login,
       verifyOtp,
+      resendOtp: resend,
       signup,
       logout
     }),

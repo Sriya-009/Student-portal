@@ -22,6 +22,13 @@ function ProjectManagement({ studentId, workspaceAction }) {
   const [projectMessages, setProjectMessages] = useState(projectChats);
   const [newMessage, setNewMessage] = useState('');
   const [workspaceNotice, setWorkspaceNotice] = useState('');
+  const [showAddTeamMember, setShowAddTeamMember] = useState(false);
+  const [newTeamMemberName, setNewTeamMemberName] = useState('');
+  const [showEditSuggestion, setShowEditSuggestion] = useState(false);
+  const [editSuggestion, setEditSuggestion] = useState({
+    taskId: '',
+    suggestion: ''
+  });
 
   const studentProjects = useMemo(
     () => {
@@ -101,6 +108,74 @@ function ProjectManagement({ studentId, workspaceAction }) {
     setNewMessage('');
   };
 
+  const handleAddTeamMember = (e) => {
+    e.preventDefault();
+    if (!newTeamMemberName.trim() || !selectedProject) {
+      alert('Please enter team member name');
+      return;
+    }
+
+    const updatedProjects = projects.map((p) => {
+      if (p.id === selectedProject) {
+        const newMemberId = `MEMBER-${Date.now()}`;
+        return {
+          ...p,
+          teamMemberIds: [...p.teamMemberIds, newMemberId],
+          teamMembers: [
+            ...p.teamMembers,
+            {
+              id: newMemberId,
+              name: newTeamMemberName,
+              role: 'Contributor'
+            }
+          ]
+        };
+      }
+      return p;
+    });
+
+    setProjects(updatedProjects);
+    setNewTeamMemberName('');
+    setShowAddTeamMember(false);
+    alert(`✓ ${newTeamMemberName} added to the project!`);
+  };
+
+  const handleRemoveTeamMember = (memberId) => {
+    if (!selectedProject) return;
+
+    const updatedProjects = projects.map((p) => {
+      if (p.id === selectedProject) {
+        return {
+          ...p,
+          teamMemberIds: p.teamMemberIds.filter((id) => id !== memberId),
+          teamMembers: p.teamMembers.filter((m) => m.id !== memberId)
+        };
+      }
+      return p;
+    });
+
+    setProjects(updatedProjects);
+    alert('✓ Team member removed from project.');
+  };
+
+  const handleSendEditSuggestion = (e) => {
+    e.preventDefault();
+    if (!editSuggestion.suggestion.trim() || !selectedProject) {
+      alert('Please enter a suggestion');
+      return;
+    }
+
+    const taskToEdit = tasks.find((t) => t.id === editSuggestion.taskId);
+    if (!taskToEdit) {
+      alert('Task not found');
+      return;
+    }
+
+    alert(`✓ Suggestion sent: "${editSuggestion.suggestion}" for task "${taskToEdit.title}"`);
+    setEditSuggestion({ taskId: '', suggestion: '' });
+    setShowEditSuggestion(false);
+  };
+
   useEffect(() => {
     if (!workspaceAction?.id) {
       return;
@@ -143,6 +218,14 @@ function ProjectManagement({ studentId, workspaceAction }) {
         setWorkspaceNotice('Filtered to completed projects.');
         break;
       case 'team-add-join':
+        openProjectView(firstProject, 'overview');
+        if (firstProject && firstProject.ownerId === studentId) {
+          setShowAddTeamMember(true);
+          setWorkspaceNotice('Add team members to your project.');
+        } else {
+          setWorkspaceNotice('Only project owners can add team members.');
+        }
+        break;
       case 'team-communicate':
         openProjectView(firstProject, 'chat');
         setWorkspaceNotice('Team collaboration opened in project chat.');
@@ -161,6 +244,11 @@ function ProjectManagement({ studentId, workspaceAction }) {
         } else {
           setWorkspaceNotice('Task management opened.');
         }
+        break;
+      case 'task-modify':
+        openProjectView(leadProject, 'tasks');
+        setShowEditSuggestion(true);
+        setWorkspaceNotice('Send edit suggestions for tasks.');
         break;
       case 'file-upload':
       case 'file-update':
@@ -331,9 +419,29 @@ function ProjectManagement({ studentId, workspaceAction }) {
                             <strong>{member.name}</strong>
                             <p>{member.role}</p>
                           </div>
+                          {selectedProjectData.ownerId === studentId && (
+                            <button
+                              type="button"
+                              className="remove-member-btn"
+                              onClick={() => handleRemoveTeamMember(member.id)}
+                              title="Remove from project"
+                            >
+                              ✕
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
+                    {selectedProjectData.ownerId === studentId && (
+                      <button
+                        type="button"
+                        className="primary-dark-btn"
+                        onClick={() => setShowAddTeamMember(true)}
+                        style={{ marginTop: '12px' }}
+                      >
+                        + Add Team Member
+                      </button>
+                    )}
                   </div>
                 </>
               )}
@@ -502,6 +610,79 @@ function ProjectManagement({ studentId, workspaceAction }) {
             <div className="modal-actions">
               <button type="button" className="outline-btn" onClick={() => { setShowEditForm(false); setEditProject(null); }}>Cancel</button>
               <button type="submit" className="primary-dark-btn">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {showAddTeamMember ? (
+        <div className="modal-overlay">
+          <form className="modal-card" onSubmit={handleAddTeamMember}>
+            <div className="modal-head">
+              <div>
+                <h3>Add Team Member</h3>
+                <p>Add a new member to your project</p>
+              </div>
+              <button type="button" className="icon-btn" onClick={() => setShowAddTeamMember(false)}>✕</button>
+            </div>
+
+            <label htmlFor="memberName">Team Member Name</label>
+            <input
+              id="memberName"
+              type="text"
+              placeholder="Enter member name"
+              value={newTeamMemberName}
+              onChange={(e) => setNewTeamMemberName(e.target.value)}
+              required
+            />
+
+            <div className="modal-actions">
+              <button type="button" className="outline-btn" onClick={() => setShowAddTeamMember(false)}>Cancel</button>
+              <button type="submit" className="primary-dark-btn">Add Member</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {showEditSuggestion && selectedProjectData ? (
+        <div className="modal-overlay">
+          <form className="modal-card" onSubmit={handleSendEditSuggestion}>
+            <div className="modal-head">
+              <div>
+                <h3>Send Edit Suggestion</h3>
+                <p>Suggest changes to a task</p>
+              </div>
+              <button type="button" className="icon-btn" onClick={() => { setShowEditSuggestion(false); setEditSuggestion({ taskId: '', suggestion: '' }); }}>✕</button>
+            </div>
+
+            <label htmlFor="suggestionTask">Select Task</label>
+            <select
+              id="suggestionTask"
+              value={editSuggestion.taskId}
+              onChange={(e) => setEditSuggestion({ ...editSuggestion, taskId: e.target.value })}
+              required
+            >
+              <option value="">Choose a task...</option>
+              {tasks
+                .filter((t) => t.projectId === selectedProjectData.id)
+                .map((task) => (
+                  <option key={task.id} value={task.id}>{task.title}</option>
+                ))}
+            </select>
+
+            <label htmlFor="suggestionText">Your Suggestion</label>
+            <textarea
+              id="suggestionText"
+              placeholder="Describe your suggested edits or improvements..."
+              value={editSuggestion.suggestion}
+              onChange={(e) => setEditSuggestion({ ...editSuggestion, suggestion: e.target.value })}
+              rows="4"
+              required
+            />
+
+            <div className="modal-actions">
+              <button type="button" className="outline-btn" onClick={() => { setShowEditSuggestion(false); setEditSuggestion({ taskId: '', suggestion: '' }); }}>Cancel</button>
+              <button type="submit" className="primary-dark-btn">Send Suggestion</button>
             </div>
           </form>
         </div>

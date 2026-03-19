@@ -3,8 +3,7 @@ import { useState } from 'react';
 const facultySections = [
   {
     id: 'approval',
-    title: '📋 Project Approval',
-    icon: '✓',
+    title: 'Project Approval',
     items: [
       { label: 'Review Proposals', actionId: 'approval-review' },
       { label: 'Pending Approvals', actionId: 'approval-pending' },
@@ -15,8 +14,7 @@ const facultySections = [
   },
   {
     id: 'monitoring',
-    title: '📊 Project Monitoring',
-    icon: '→',
+    title: 'Project Monitoring',
     items: [
       { label: 'View All Projects', actionId: 'monitor-all-projects' },
       { label: 'Track Progress', actionId: 'monitor-progress' },
@@ -27,8 +25,7 @@ const facultySections = [
   },
   {
     id: 'tasks',
-    title: '✓ Task Oversight',
-    icon: '◉',
+    title: 'Task Oversight',
     items: [
       { label: 'Review Tasks', actionId: 'task-review' },
       { label: 'Task Distribution', actionId: 'task-distribution' },
@@ -39,8 +36,7 @@ const facultySections = [
   },
   {
     id: 'files',
-    title: '📁 File & Submission Review',
-    icon: '🔍',
+    title: 'File & Submission Review',
     items: [
       { label: 'View Submissions', actionId: 'file-view' },
       { label: 'Verify Uploads', actionId: 'file-verify' },
@@ -51,8 +47,7 @@ const facultySections = [
   },
   {
     id: 'communication',
-    title: '💬 Communication',
-    icon: '✉',
+    title: 'Communication',
     items: [
       { label: 'Message Students', actionId: 'communicate-message' },
       { label: 'Send Notifications', actionId: 'communicate-notify' },
@@ -63,8 +58,7 @@ const facultySections = [
   },
   {
     id: 'feedback',
-    title: '💭 Feedback & Evaluation',
-    icon: '★',
+    title: 'Feedback & Evaluation',
     items: [
       { label: 'Provide Feedback', actionId: 'feedback-add' },
       { label: 'Review Comments', actionId: 'feedback-review' },
@@ -75,8 +69,7 @@ const facultySections = [
   },
   {
     id: 'grading',
-    title: '📝 Grading & Marks',
-    icon: '#',
+    title: 'Grading & Marks',
     items: [
       { label: 'Assign Marks', actionId: 'grade-assign' },
       { label: 'Update Grades', actionId: 'grade-update' },
@@ -87,8 +80,7 @@ const facultySections = [
   },
   {
     id: 'reports',
-    title: '📈 Reports & Analytics',
-    icon: '📊',
+    title: 'Reports & Analytics',
     items: [
       { label: 'Generate Reports', actionId: 'report-generate' },
       { label: 'Performance Analysis', actionId: 'report-performance' },
@@ -99,8 +91,7 @@ const facultySections = [
   },
   {
     id: 'final-actions',
-    title: '✓ Final Actions',
-    icon: '⊕',
+    title: 'Final Actions',
     items: [
       { label: 'Mark Complete', actionId: 'final-mark-complete' },
       { label: 'Publish Results', actionId: 'final-publish' },
@@ -135,7 +126,7 @@ function FacultyWorkspaceSidebar({ onSectionSelect, onActionSelect }) {
 
   return (
     <nav className="workspace-sidebar faculty-sidebar">
-      <h2 className="workspace-title">👨‍🏫 Faculty Workspace</h2>
+      <h2 className="workspace-title">Faculty Workspace</h2>
 
       {facultySections.map((section) => (
         <div key={section.id} className="workspace-section">
@@ -144,7 +135,6 @@ function FacultyWorkspaceSidebar({ onSectionSelect, onActionSelect }) {
             onClick={() => handleSectionClick(section.id)}
             aria-expanded={openSections.has(section.id)}
           >
-            <span className="section-icon">{section.icon}</span>
             {section.title}
             <span className="expand-icon">{openSections.has(section.id) ? '▼' : '▶'}</span>
           </button>

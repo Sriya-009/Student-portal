@@ -150,6 +150,29 @@
   margin-block-start: 6px;
 }
 
+.resend-otp-section {
+  display: grid;
+  gap: 12px;
+  margin-block-start: 8px;
+}
+
+.success-message {
+  color: #16a34a;
+  margin: 0;
+  font-size: 30px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.resend-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+body.dark-mode .success-message {
+  color: #22c55e;
+}
+
 body.dark-mode .auth-page {
   background: #0f172a;
 }

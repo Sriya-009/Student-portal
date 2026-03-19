@@ -453,3 +453,19 @@ export const facultyCredentials = [
   { facultyId: 'MENTOR-002', password: 'faculty123' },
   { facultyId: 'MENTOR-003', password: 'faculty123' }
 ];
+
+export const profileUpdateRequests = [
+  {
+    id: 'UPD-001',
+    userId: 'STU001',
+    userType: 'student',
+    currentData: { name: 'Emma Johnson', email: 'emma.johnson@school.edu', phoneNumber: '+1-555-0101' },
+    proposedData: { name: 'Emma Johnson', email: 'emma.j@school.edu', phoneNumber: '+1-555-0105' },
+    status: 'pending',
+    reason: 'Updated email and phone number',
+    requestedDate: '2026-03-18',
+    reviewedDate: null,
+    reviewedBy: null,
+    adminComment: ''
+  }
+];
