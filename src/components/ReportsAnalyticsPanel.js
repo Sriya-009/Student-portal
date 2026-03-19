@@ -1,4 +1,4 @@
-function ReportsAnalyticsPanel({ projects, grades }) {
+function ReportsAnalyticsPanel({ projects, grades, activeAction }) {
   const handleGenerateReport = () => {
     const report = `
 COMPREHENSIVE PROJECT & GRADING REPORT
@@ -78,6 +78,19 @@ Deadline: ${p.deadline}
     postponed: projects.filter((p) => p.status === 'postponed').length
   };
 
+  const completionRate = projects.length > 0
+    ? Math.round((projectsByStatus.completed / projects.length) * 100)
+    : 0;
+
+  const problemAreas = projects.filter((project) => project.progressPercent < 50);
+
+  const showGenerate = !activeAction || activeAction === 'reports-overview' || activeAction === 'report-generate';
+  const showPerformance = activeAction === 'report-performance';
+  const showCompletion = activeAction === 'report-completion';
+  const showProblems = activeAction === 'report-problems';
+  const showExport = activeAction === 'report-export';
+  const showGradeDistribution = showGenerate || showPerformance;
+
   return (
     <section className="faculty-panel reports-panel">
       <div className="panel-grid">
@@ -96,86 +109,129 @@ Deadline: ${p.deadline}
       </div>
 
       <div className="panel-content">
-        <h3>Project Status Report</h3>
-        <div className="report-grid">
-          <div className="report-card">
-            <h4>Status Distribution</h4>
-            <div className="status-list">
-              <div className="status-item">
-                <span>Ongoing</span>
-                <strong>{projectsByStatus.ongoing}</strong>
+        {showGenerate && (
+          <>
+            <h3>Generate Reports</h3>
+            <div className="button-group" style={{ marginBottom: '16px' }}>
+              <button className="btn-success" onClick={handleGenerateReport}>Generate Full Report</button>
+              <button className="btn-primary" onClick={handleExportCSV}>Export to CSV</button>
+              <button className="btn-secondary" onClick={handleEmailReport}>Email Report</button>
+            </div>
+          </>
+        )}
+
+        {showPerformance && (
+          <>
+            <h3>Performance Analysis</h3>
+            <div className="report-grid">
+              <div className="report-card">
+                <h4>Status Distribution</h4>
+                <div className="status-list">
+                  <div className="status-item"><span>Ongoing</span><strong>{projectsByStatus.ongoing}</strong></div>
+                  <div className="status-item"><span>Completed</span><strong>{projectsByStatus.completed}</strong></div>
+                  <div className="status-item"><span>Postponed</span><strong>{projectsByStatus.postponed}</strong></div>
+                </div>
               </div>
-              <div className="status-item">
-                <span>Completed</span>
-                <strong>{projectsByStatus.completed}</strong>
-              </div>
-              <div className="status-item">
-                <span>Postponed</span>
-                <strong>{projectsByStatus.postponed}</strong>
+
+              <div className="report-card">
+                <h4>Performance Metrics</h4>
+                <div className="metrics-list">
+                  <div className="metric-item"><span>Average Progress</span><strong>{avgProgress}%</strong></div>
+                  <div className="metric-item"><span>Average Grade</span><strong>{avgGrade}%</strong></div>
+                  <div className="metric-item"><span>Completion Rate</span><strong>{completionRate}%</strong></div>
+                </div>
               </div>
             </div>
-          </div>
+          </>
+        )}
 
-          <div className="report-card">
-            <h4>Performance Metrics</h4>
-            <div className="metrics-list">
-              <div className="metric-item">
-                <span>On-Time Completion</span>
-                <strong>85%</strong>
+        {showCompletion && (
+          <>
+            <h3>Completion Rates</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Status</th>
+                  <th>Progress</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projects.map((project) => (
+                  <tr key={project.id}>
+                    <td>{project.name}</td>
+                    <td>{project.status}</td>
+                    <td>{project.progressPercent}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="muted-line">Overall completion rate: {completionRate}%</p>
+          </>
+        )}
+
+        {showProblems && (
+          <>
+            <h3>Problem Areas</h3>
+            {problemAreas.length === 0 ? (
+              <p className="empty-state">No critical project issues detected.</p>
+            ) : (
+              <div className="proposals-list">
+                {problemAreas.map((project) => (
+                  <div key={project.id} className="proposal-card">
+                    <h4>{project.name}</h4>
+                    <p className="proposal-meta">Progress: <strong>{project.progressPercent}%</strong></p>
+                    <p className="proposal-meta">Deadline: <strong>{project.deadline}</strong></p>
+                  </div>
+                ))}
               </div>
-              <div className="metric-item">
-                <span>Quality Score</span>
-                <strong>78%</strong>
-              </div>
-              <div className="metric-item">
-                <span>Attendance Rate</span>
-                <strong>92%</strong>
-              </div>
+            )}
+          </>
+        )}
+
+        {showExport && (
+          <>
+            <h3>Export Data</h3>
+            <div className="button-group">
+              <button className="btn-primary" onClick={handleExportCSV}>Export to CSV</button>
+              <button className="btn-secondary" onClick={handleEmailReport}>Email Report</button>
             </div>
-          </div>
-        </div>
+          </>
+        )}
 
-        <h3 style={{ marginTop: '32px' }}>Grade Distribution</h3>
-        <div className="grade-distribution">
-          {[
-            { range: 'A (90-100%)', count: grades.filter((g) => (g.totalMark / g.maxMark * 100) >= 90).length, color: '#10b981' },
-            { range: 'B (80-89%)', count: grades.filter((g) => {
-              const pct = g.totalMark / g.maxMark * 100;
-              return pct >= 80 && pct < 90;
-            }).length, color: '#3b82f6' },
-            { range: 'C (70-79%)', count: grades.filter((g) => {
-              const pct = g.totalMark / g.maxMark * 100;
-              return pct >= 70 && pct < 80;
-            }).length, color: '#f59e0b' },
-            { range: 'Below 70%', count: grades.filter((g) => (g.totalMark / g.maxMark * 100) < 70).length, color: '#ef4444' }
-          ].map((grade, idx) => (
-            <div key={idx} className="grade-bar-item">
-              <span>{grade.range}</span>
-              <div className="grade-bar">
-                <div
-                  className="grade-bar-fill"
-                  style={{
-                    width: grades.length > 0 ? `${(grade.count / grades.length) * 100}%` : '0%',
-                    backgroundColor: grade.color
-                  }}
-                />
-              </div>
-              <span>{grade.count} students</span>
+        {showGradeDistribution && (
+          <>
+            <h3 style={{ marginTop: '24px' }}>Grade Distribution</h3>
+            <div className="grade-distribution">
+              {[
+                { range: 'A (90-100%)', count: grades.filter((g) => (g.totalMark / g.maxMark * 100) >= 90).length, color: '#10b981' },
+                { range: 'B (80-89%)', count: grades.filter((g) => {
+                  const pct = g.totalMark / g.maxMark * 100;
+                  return pct >= 80 && pct < 90;
+                }).length, color: '#3b82f6' },
+                { range: 'C (70-79%)', count: grades.filter((g) => {
+                  const pct = g.totalMark / g.maxMark * 100;
+                  return pct >= 70 && pct < 80;
+                }).length, color: '#f59e0b' },
+                { range: 'Below 70%', count: grades.filter((g) => (g.totalMark / g.maxMark * 100) < 70).length, color: '#ef4444' }
+              ].map((grade, idx) => (
+                <div key={idx} className="grade-bar-item">
+                  <span>{grade.range}</span>
+                  <div className="grade-bar">
+                    <div
+                      className="grade-bar-fill"
+                      style={{
+                        width: grades.length > 0 ? `${(grade.count / grades.length) * 100}%` : '0%',
+                        backgroundColor: grade.color
+                      }}
+                    />
+                  </div>
+                  <span>{grade.count} students</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-
-        <div className="button-group" style={{ marginTop: '24px' }}>
-          <button className="btn-success" onClick={handleGenerateReport}>
-            Generate Full Report
-          </button>
-          <button className="btn-primary" onClick={handleExportCSV}>
-            Export to CSV
-          </button>
-          <button className="btn-secondary" onClick={handleEmailReport}>
-            Email Report
-          </button>
-        </div>
+          </>
+        )}
       </div>
     </section>
   );

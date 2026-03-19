@@ -18,6 +18,7 @@ import '../styles/dashboard.css';
 
 function FacultyDashboard() {
   const [activeView, setActiveView] = useState('approval');
+  const [activeAction, setActiveAction] = useState('approval-review');
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -37,25 +38,25 @@ function FacultyDashboard() {
   const renderActiveView = () => {
     switch (activeView) {
       case 'approval':
-        return <ProjectApprovalPanel proposals={projectProposals} mentors={mentors} />;
+        return <ProjectApprovalPanel proposals={projectProposals} mentors={mentors} activeAction={activeAction} />;
       case 'monitoring':
-        return <ProjectMonitoringPanel projects={bTechProjects} />;
+        return <ProjectMonitoringPanel projects={bTechProjects} tasks={projectTasks} activeAction={activeAction} />;
       case 'tasks':
-        return <TaskOversightPanel tasks={projectTasks} studentsMap={getStudentMap()} />;
+        return <TaskOversightPanel tasks={projectTasks} studentsMap={getStudentMap()} activeAction={activeAction} />;
       case 'files':
-        return <FileReviewPanel files={projectFiles} projects={bTechProjects} />;
+        return <FileReviewPanel files={projectFiles} projects={bTechProjects} activeAction={activeAction} />;
       case 'student-search':
-        return <StudentSearchPanel students={students} />;
+        return <StudentSearchPanel students={students} activeAction={activeAction} />;
       case 'communication':
-        return <CommunicationPanel facultyId={currentFaculty.id} />;
+        return <CommunicationPanel facultyId={currentFaculty.id} activeAction={activeAction} />;
       case 'feedback':
-        return <FeedbackEvaluationPanel grades={projectGrades} facultyId={currentFaculty.id} />;
+        return <FeedbackEvaluationPanel grades={projectGrades} facultyId={currentFaculty.id} activeAction={activeAction} />;
       case 'grading':
         return <GradingPanel grades={projectGrades} projects={bTechProjects} />;
       case 'reports':
-        return <ReportsAnalyticsPanel projects={bTechProjects} grades={projectGrades} />;
+        return <ReportsAnalyticsPanel projects={bTechProjects} grades={projectGrades} activeAction={activeAction} />;
       case 'final-actions':
-        return <FinalActionsPanel projects={bTechProjects} />;
+        return <FinalActionsPanel projects={bTechProjects} activeAction={activeAction} />;
       default:
         return <ProjectApprovalPanel proposals={projectProposals} mentors={mentors} />;
     }
@@ -90,8 +91,10 @@ function FacultyDashboard() {
           <FacultyWorkspaceSidebar
             onSectionSelect={(sectionId) => {
               setActiveView(sectionId);
+              setActiveAction(`${sectionId}-overview`);
             }}
             onActionSelect={(actionId) => {
+              setActiveAction(actionId);
               // Map action IDs to views
               if (actionId.includes('approval') || actionId.includes('approve')) {
                 setActiveView('approval');
@@ -150,8 +153,8 @@ function getPageTitle(viewId) {
 function getPageDescription(viewId) {
   const descriptions = {
     approval: 'Review and approve student project proposals',
-    monitoring: 'Track ongoing projects and monitor progress',
-    tasks: 'Review and supervise task management',
+    monitoring: 'View projects, track progress, completion, deadlines, and status',
+    tasks: 'Review tasks, distribution, suggestions, oversight, and analytics',
     files: 'Verify file submissions and track versions',
     'student-search': 'Search students by ID number or department',
     communication: 'Communicate with students and provide guidance',

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-function FileReviewPanel({ files, projects }) {
+function FileReviewPanel({ files, projects, activeAction }) {
   const [filesState, setFilesState] = useState(files);
 
   const submittedFiles = filesState.filter((f) => f.isSubmitted);
@@ -22,6 +22,23 @@ function FileReviewPanel({ files, projects }) {
     alert(`Reminder sent for ${file.fileName} (${file.projectId}).`);
   };
 
+  const selectedAction = activeAction || 'files-overview';
+  const showViewSubmissions = selectedAction === 'file-view' || selectedAction === 'files-overview';
+  const showVerifyUploads = selectedAction === 'file-verify';
+  const showVersions = selectedAction === 'file-versions';
+  const showSubmissionStatus = selectedAction === 'submission-status';
+  const showPendingSubmissions = selectedAction === 'submission-pending';
+
+  const latestByProject = Object.values(
+    filesState.reduce((acc, file) => {
+      const current = acc[file.projectId];
+      if (!current || file.version > current.version) {
+        acc[file.projectId] = file;
+      }
+      return acc;
+    }, {})
+  );
+
   return (
     <section className="faculty-panel">
       <div className="panel-grid">
@@ -40,51 +57,130 @@ function FileReviewPanel({ files, projects }) {
       </div>
 
       <div className="panel-content">
-        <h3>File Submission Status</h3>
-
-        <div className="file-review-section">
-          <h4>Submitted Files</h4>
-          <div className="files-grid">
-            {submittedFiles.length === 0 ? (
-              <p className="empty-state">No submitted files yet.</p>
-            ) : (
-              submittedFiles.map((file) => (
-                <div key={file.id} className="file-card">
-                  <div className="file-icon">FILE</div>
-                  <h5>{file.fileName}</h5>
-                  <p className="file-info">Project: <strong>{file.projectId}</strong></p>
-                  <p className="file-info">Uploaded: <strong>{file.uploadedDate}</strong></p>
-                  <p className="file-info">Version: <strong>v{file.version}</strong></p>
-                  <p className="file-desc">{file.description}</p>
-                  <div className="file-actions">
-                    <button className="btn-secondary" onClick={() => handleDownload(file)}>Download</button>
-                    <button className="btn-primary" onClick={() => handleVerify(file.id)}>Verify</button>
+        {showViewSubmissions && (
+          <div className="file-review-section">
+            <h4>View Submissions</h4>
+            <div className="files-grid">
+              {submittedFiles.length === 0 ? (
+                <p className="empty-state">No submitted files yet.</p>
+              ) : (
+                submittedFiles.map((file) => (
+                  <div key={file.id} className="file-card">
+                    <div className="file-icon">FILE</div>
+                    <h5>{file.fileName}</h5>
+                    <p className="file-info">Project: <strong>{file.projectId}</strong></p>
+                    <p className="file-info">Uploaded: <strong>{file.uploadedDate}</strong></p>
+                    <p className="file-info">Version: <strong>v{file.version}</strong></p>
+                    <p className="file-desc">{file.description}</p>
+                    <div className="file-actions">
+                      <button className="btn-secondary" onClick={() => handleDownload(file)}>Download</button>
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="file-review-section">
-          <h4>Pending Submissions</h4>
-          <div className="files-grid">
-            {pendingFiles.length === 0 ? (
-              <p className="empty-state">All files have been submitted!</p>
-            ) : (
-              pendingFiles.map((file) => (
-                <div key={file.id} className="file-card pending">
-                  <div className="file-icon">PENDING</div>
-                  <h5>{file.fileName}</h5>
-                  <p className="file-info">Project: <strong>{file.projectId}</strong></p>
-                  <p className="file-info">Expected: <strong>{file.uploadedDate}</strong></p>
-                  <p className="status-badge">Awaiting Submission</p>
-                  <button className="btn-secondary" onClick={() => handleReminder(file)}>Send Reminder</button>
-                </div>
-              ))
-            )}
+        {showVerifyUploads && (
+          <div className="file-review-section">
+            <h4>Verify Uploads</h4>
+            <div className="files-grid">
+              {filesState.length === 0 ? (
+                <p className="empty-state">No uploads available.</p>
+              ) : (
+                filesState.map((file) => (
+                  <div key={file.id} className="file-card">
+                    <h5>{file.fileName}</h5>
+                    <p className="file-info">Project: <strong>{file.projectId}</strong></p>
+                    <p className="file-info">Status: <strong>{file.isSubmitted ? 'Submitted' : 'Pending'}</strong></p>
+                    <div className="file-actions">
+                      <button className="btn-secondary" onClick={() => handleDownload(file)}>Download</button>
+                      <button className="btn-primary" onClick={() => handleVerify(file.id)}>Verify</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        )}
+
+        {showVersions && (
+          <div className="file-review-section">
+            <h4>Check Versions</h4>
+            <table>
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>File Name</th>
+                  <th>Current Version</th>
+                  <th>Uploaded Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {latestByProject.map((file) => (
+                  <tr key={file.projectId}>
+                    <td>{file.projectId}</td>
+                    <td>{file.fileName}</td>
+                    <td>v{file.version}</td>
+                    <td>{file.uploadedDate}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {showSubmissionStatus && (
+          <div className="file-review-section">
+            <h4>Submission Status</h4>
+            <table>
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Submitted Files</th>
+                  <th>Pending Files</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projects.map((project) => {
+                  const byProject = filesState.filter((file) => file.projectId === project.id);
+                  const projectSubmitted = byProject.filter((file) => file.isSubmitted).length;
+                  const projectPending = byProject.filter((file) => !file.isSubmitted).length;
+                  return (
+                    <tr key={project.id}>
+                      <td>{project.id}</td>
+                      <td>{projectSubmitted}</td>
+                      <td>{projectPending}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {showPendingSubmissions && (
+          <div className="file-review-section">
+            <h4>Pending Submissions</h4>
+            <div className="files-grid">
+              {pendingFiles.length === 0 ? (
+                <p className="empty-state">All files have been submitted.</p>
+              ) : (
+                pendingFiles.map((file) => (
+                  <div key={file.id} className="file-card pending">
+                    <div className="file-icon">PENDING</div>
+                    <h5>{file.fileName}</h5>
+                    <p className="file-info">Project: <strong>{file.projectId}</strong></p>
+                    <p className="file-info">Expected: <strong>{file.uploadedDate}</strong></p>
+                    <p className="status-badge">Awaiting Submission</p>
+                    <button className="btn-secondary" onClick={() => handleReminder(file)}>Send Reminder</button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

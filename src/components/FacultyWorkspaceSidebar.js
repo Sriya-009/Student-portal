@@ -30,7 +30,7 @@ const facultySections = [
       { label: 'Review Tasks', actionId: 'task-review' },
       { label: 'Task Distribution', actionId: 'task-distribution' },
       { label: 'Suggest Modifications', actionId: 'task-modify' },
-      { label: 'Overdue Tasks', actionId: 'task-overdue' },
+      { label: 'Oversee Tasks', actionId: 'task-oversee' },
       { label: 'Task Analytics', actionId: 'task-analytics' }
     ]
   },

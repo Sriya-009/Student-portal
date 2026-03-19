@@ -1,9 +1,16 @@
 import { useMemo, useState } from 'react';
 
-function StudentSearchPanel({ students }) {
+function StudentSearchPanel({ students, activeAction }) {
   const [searchMode, setSearchMode] = useState('id');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
+
+  const actionMode = useMemo(() => {
+    if (activeAction === 'student-id-search') return 'id';
+    if (activeAction === 'student-dept-search') return 'department';
+    if (activeAction === 'student-search-all') return 'all';
+    return null;
+  }, [activeAction]);
 
   const departments = useMemo(() => {
     return Array.from(new Set((students || []).map((s) => s.department).filter(Boolean))).sort();
@@ -12,7 +19,13 @@ function StudentSearchPanel({ students }) {
   const filteredStudents = useMemo(() => {
     if (!students || students.length === 0) return [];
 
-    if (searchMode === 'department') {
+    if (actionMode === 'all') {
+      return students;
+    }
+
+    const effectiveMode = actionMode || searchMode;
+
+    if (effectiveMode === 'department') {
       if (!selectedDepartment) return students;
       return students.filter((student) => student.department === selectedDepartment);
     }
@@ -27,7 +40,7 @@ function StudentSearchPanel({ students }) {
         student.name.toLowerCase().includes(normalized)
       );
     });
-  }, [students, searchMode, searchQuery, selectedDepartment]);
+  }, [students, searchMode, searchQuery, selectedDepartment, actionMode]);
 
   const resetFilters = () => {
     setSearchMode('id');
@@ -59,21 +72,32 @@ function StudentSearchPanel({ students }) {
           <div className="search-mode-group">
             <button
               type="button"
-              className={`btn-secondary ${searchMode === 'id' ? 'active' : ''}`}
+              className={`btn-secondary ${(actionMode || searchMode) === 'id' ? 'active' : ''}`}
               onClick={() => setSearchMode('id')}
             >
               Search by ID Number
             </button>
             <button
               type="button"
-              className={`btn-secondary ${searchMode === 'department' ? 'active' : ''}`}
+              className={`btn-secondary ${(actionMode || searchMode) === 'department' ? 'active' : ''}`}
               onClick={() => setSearchMode('department')}
             >
               Search by Department
             </button>
+            <button
+              type="button"
+              className={`btn-secondary ${actionMode === 'all' ? 'active' : ''}`}
+              onClick={() => {
+                setSearchMode('id');
+                setSearchQuery('');
+                setSelectedDepartment('');
+              }}
+            >
+              View All Students
+            </button>
           </div>
 
-          {searchMode === 'id' ? (
+          {(actionMode || searchMode) === 'id' ? (
             <input
               type="text"
               className="form-input"

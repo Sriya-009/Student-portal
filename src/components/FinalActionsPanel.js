@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 
-function FinalActionsPanel({ projects, grades }) {
+function FinalActionsPanel({ projects, grades, activeAction }) {
   const [projectsState, setProjectsState] = useState(projects);
   const [completedProjects, setCompletedProjects] = useState(new Set());
   const [archivedProjects, setArchivedProjects] = useState(new Set());
   const [confirmAction, setConfirmAction] = useState(null);
-  const [selectedProject, setSelectedProject] = useState(null);
+  const [isResultsPublished, setIsResultsPublished] = useState(false);
+  const [cleanupCount, setCleanupCount] = useState(0);
 
   const completedCount = useMemo(
     () => completedProjects.size,
@@ -32,7 +33,7 @@ function FinalActionsPanel({ projects, grades }) {
 
     setProjectsState(updatedProjects);
     setCompletedProjects(new Set(completedProjects).add(confirmAction.projectId));
-    alert(`✓ Project marked as completed!`);
+    alert('Project marked as completed.');
     setConfirmAction(null);
   };
 
@@ -49,7 +50,7 @@ function FinalActionsPanel({ projects, grades }) {
 
     setProjectsState(updatedProjects);
     setArchivedProjects(new Set(archivedProjects).add(confirmAction.projectId));
-    alert(`✓ Project archived successfully!`);
+    alert('Project archived successfully.');
     setConfirmAction(null);
   };
 
@@ -60,12 +61,14 @@ function FinalActionsPanel({ projects, grades }) {
       return;
     }
 
-    alert(`✓ Results published to ${completedProj} students!`);
+    setIsResultsPublished(true);
+    alert(`Results published to ${completedProj} students.`);
   };
 
   const handleCleanup = () => {
     const totalProjects = projectsState.length;
     const cleanedProjects = projectsState.filter((p) => p.isArchived).length;
+    setCleanupCount(cleanedProjects);
 
     alert(`Database Cleanup Report:\n- Total Projects: ${totalProjects}\n- Cleaned (Archived): ${cleanedProjects}`);
   };
@@ -88,10 +91,15 @@ function FinalActionsPanel({ projects, grades }) {
 
   const cancelConfirmation = () => {
     setConfirmAction(null);
-    setSelectedProject(null);
   };
 
   const incompleteProjects = projectsState.filter((p) => p.status !== 'completed' && !archivedProjects.has(p.id));
+
+  const showMarkComplete = !activeAction || activeAction === 'final-actions-overview' || activeAction === 'final-mark-complete';
+  const showPublish = activeAction === 'final-publish';
+  const showArchive = activeAction === 'final-archive';
+  const showCleanup = activeAction === 'final-cleanup';
+  const showReview = activeAction === 'final-review';
 
   return (
     <section className="faculty-panel final-actions-panel">
@@ -115,9 +123,9 @@ function FinalActionsPanel({ projects, grades }) {
       </div>
 
       <div className="panel-content">
-        <div className="action-grid">
+        {showMarkComplete && (
           <div className="action-section">
-            <h3>Complete Projects</h3>
+            <h3>Mark Complete</h3>
             <div className="project-list">
               {incompleteProjects.length === 0 ? (
                 <p className="empty-state">All projects completed or archived</p>
@@ -126,13 +134,12 @@ function FinalActionsPanel({ projects, grades }) {
                   <div key={proj.id} className="project-item">
                     <div className="project-info">
                       <strong>{proj.id}</strong>
-                      <p>{proj.title}</p>
+                      <p>{proj.name}</p>
                       <p className="project-status">{proj.status}</p>
                     </div>
                     <button
                       className="btn-success"
                       onClick={() => {
-                        setSelectedProject(proj.id);
                         handleMarkComplete(proj.id);
                       }}
                     >
@@ -143,48 +150,61 @@ function FinalActionsPanel({ projects, grades }) {
               )}
             </div>
           </div>
+        )}
 
-          <div className="action-section">
-            <h3>Archive & Cleanup</h3>
-            <ul className="checklist">
-              <li>
-                <strong>Archive completed projects</strong>
-                <p>Move finalized projects to archive</p>
-              </li>
-              <li>
-                <strong>Cleanup old data</strong>
-                <p>Remove temporary records and cleanup</p>
-              </li>
-              <li>
-                <strong>Final review</strong>
-                <p>Review summary before publish</p>
-              </li>
-            </ul>
-
-            <div className="button-group">
-              <button className="btn-primary" onClick={() => handleArchive(selectedProject || projectsState[0]?.id)}>
-                Archive Projects
-              </button>
-              <button className="btn-secondary" onClick={handleCleanup}>
-                Cleanup
-              </button>
-              <button className="btn-info" onClick={handleFinalReview}>
-                Final Review
-              </button>
-            </div>
-          </div>
-
+        {showPublish && (
           <div className="action-section">
             <h3>Publish Results</h3>
             <div className="publish-section">
               <h4>Publish to Students</h4>
-              <p>Notify all students of their final grades and feedback</p>
-              <button className="btn-success" onClick={handlePublishResults}>
-                Publish Results
-              </button>
+              <p>Notify students of final grades and feedback.</p>
+              <button className="btn-success" onClick={handlePublishResults}>Publish Results</button>
+              <p className="project-status">Status: {isResultsPublished ? 'Published' : 'Not Published'}</p>
             </div>
           </div>
-        </div>
+        )}
+
+        {showArchive && (
+          <div className="action-section">
+            <h3>Archive Projects</h3>
+            <div className="project-list">
+              {projectsState.filter((proj) => proj.status === 'completed').map((proj) => (
+                <div key={proj.id} className="project-item">
+                  <div className="project-info">
+                    <strong>{proj.id}</strong>
+                    <p>{proj.name}</p>
+                  </div>
+                  <button className="btn-primary" onClick={() => handleArchive(proj.id)}>Archive</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showCleanup && (
+          <div className="action-section">
+            <h3>Cleanup Tasks</h3>
+            <ul className="checklist">
+              <li><strong>Archive completed projects</strong><p>Move finalized projects to archive.</p></li>
+              <li><strong>Cleanup old data</strong><p>Remove temporary records and cleanup.</p></li>
+            </ul>
+            <button className="btn-secondary" onClick={handleCleanup}>Run Cleanup</button>
+            <p className="project-status">Last cleanup archived count: {cleanupCount}</p>
+          </div>
+        )}
+
+        {showReview && (
+          <div className="action-section">
+            <h3>Final Review</h3>
+            <div className="panel-grid">
+              <div className="stat-card"><h3>Total</h3><p className="stat-value">{projectsState.length}</p></div>
+              <div className="stat-card"><h3>Completed</h3><p className="stat-value">{completedCount}</p></div>
+              <div className="stat-card"><h3>Archived</h3><p className="stat-value">{archivedCount}</p></div>
+              <div className="stat-card"><h3>Published</h3><p className="stat-value">{isResultsPublished ? 'Yes' : 'No'}</p></div>
+            </div>
+            <button className="btn-info" onClick={handleFinalReview}>Run Final Review</button>
+          </div>
+        )}
       </div>
 
       {confirmAction && (

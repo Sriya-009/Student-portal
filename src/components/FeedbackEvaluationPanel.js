@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-function FeedbackEvaluationPanel({ grades, facultyId }) {
+function FeedbackEvaluationPanel({ grades, facultyId, activeAction }) {
   const [gradesState, setGradesState] = useState(
     grades.map((g) => ({
       ...g,
@@ -61,6 +61,12 @@ function FeedbackEvaluationPanel({ grades, facultyId }) {
     : 0;
   const feedbackGivenCount = gradesState.filter((g) => g.feedbackList && g.feedbackList.length > 0).length;
 
+  const showProvideFeedback = !activeAction || activeAction === 'feedback-overview' || activeAction === 'feedback-add';
+  const showReviewComments = activeAction === 'feedback-review';
+  const showSuggestImprovements = activeAction === 'feedback-suggest';
+  const showEvaluationStatus = activeAction === 'feedback-status';
+  const showPerformanceNotes = activeAction === 'feedback-notes';
+
   return (
     <section className="faculty-panel feedback-panel">
       <div className="panel-grid">
@@ -79,109 +85,156 @@ function FeedbackEvaluationPanel({ grades, facultyId }) {
       </div>
 
       <div className="panel-content">
-        <h3>Provide Feedback & Evaluation</h3>
+        {(showProvideFeedback || showSuggestImprovements) && (
+          <>
+            <h3>{showSuggestImprovements ? 'Suggest Improvements' : 'Provide Feedback'}</h3>
 
-        <div className="feedback-form" style={{ marginBottom: '32px' }}>
-          <select
-            value={selectedGrade || ''}
-            onChange={(e) => setSelectedGrade(e.target.value || null)}
-            className="form-select"
-          >
-            <option value="">Select Student Project</option>
-            {inProgressGrades.map((grade) => (
-              <option key={grade.id} value={grade.id}>
-                {grade.projectId} - {grade.studentId} - Score: {grade.totalMark}/{grade.maxMark}
-              </option>
-            ))}
-          </select>
+            <div className="feedback-form" style={{ marginBottom: '24px' }}>
+              <select
+                value={selectedGrade || ''}
+                onChange={(e) => setSelectedGrade(e.target.value || null)}
+                className="form-select"
+              >
+                <option value="">Select Student Project</option>
+                {inProgressGrades.map((grade) => (
+                  <option key={grade.id} value={grade.id}>
+                    {grade.projectId} - {grade.studentId} - Score: {grade.totalMark}/{grade.maxMark}
+                  </option>
+                ))}
+              </select>
 
-          <textarea
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Provide constructive feedback here..."
-            rows="4"
-            className="form-textarea"
-          />
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder={showSuggestImprovements ? 'Suggest improvements for this project...' : 'Provide constructive feedback here...'}
+                rows="4"
+                className="form-textarea"
+              />
 
-          <div className="button-group">
-            <button className="btn-success" onClick={handleAddFeedback}>
-              Add Feedback
-            </button>
-            <button className="btn-secondary" onClick={handleClearFeedback}>
-              Clear
-            </button>
-          </div>
-        </div>
-
-        <h3>Recent Evaluations & Feedback</h3>
-        <div className="feedback-list">
-          {gradesState.length === 0 ? (
-            <p className="empty-state">No evaluations available.</p>
-          ) : (
-            gradesState.map((grade) => (
-              <div key={grade.id} className={`feedback-card ${grade.status}`}>
-                <div className="feedback-header">
-                  <div>
-                    <h4>Project: {grade.projectId}</h4>
-                    <p>Student ID: {grade.studentId}</p>
-                  </div>
-                  <span className={`status-badge ${grade.status}`}>{grade.status}</span>
-                </div>
-
-                <div className="feedback-scores">
-                  <div className="score-item">
-                    <span>Proposal:</span>
-                    <strong>{grade.proposalMark}</strong>
-                  </div>
-                  <div className="score-item">
-                    <span>Progress:</span>
-                    <strong>{grade.progressMark}</strong>
-                  </div>
-                  <div className="score-item">
-                    <span>Implementation:</span>
-                    <strong>{grade.implementationMark}</strong>
-                  </div>
-                  <div className="score-item">
-                    <span>Final Submission:</span>
-                    <strong>{grade.finalSubmissionMark}</strong>
-                  </div>
-                  <div className="score-item total">
-                    <span>Total:</span>
-                    <strong>{grade.totalMark}/{grade.maxMark}</strong>
-                  </div>
-                </div>
-
-                {grade.comments && <p className="feedback-comment"><strong>Feedback:</strong> {grade.comments}</p>}
-                
-                {grade.feedbackList && grade.feedbackList.length > 0 && (
-                  <div className="feedback-history">
-                    <h5>Feedback History:</h5>
-                    {grade.feedbackList.map((fb) => (
-                      <div key={fb.id} className="feedback-item">
-                        <p>{fb.text}</p>
-                        <p className="feedback-meta">Added on {fb.addedDate} by {fb.addedBy}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="evaluation-actions">
-                  <select
-                    value={grade.status}
-                    onChange={(e) => handleUpdateEvaluationStatus(grade.id, e.target.value)}
-                    className="form-select"
-                    style={{ maxWidth: '200px' }}
-                  >
-                    <option value="in-progress">In Progress</option>
-                    <option value="graded">Graded</option>
-                    <option value="approved">Approved</option>
-                    <option value="completed">Completed</option>
-                  </select>
-                </div>
+              <div className="button-group">
+                <button className="btn-success" onClick={handleAddFeedback}>
+                  {showSuggestImprovements ? 'Submit Improvement Suggestion' : 'Add Feedback'}
+                </button>
+                <button className="btn-secondary" onClick={handleClearFeedback}>
+                  Clear
+                </button>
               </div>
-            ))
-          )}
-        </div>
+            </div>
+          </>
+        )}
+
+        {(showProvideFeedback || showReviewComments || showPerformanceNotes) && (
+          <>
+            <h3>{showReviewComments ? 'Review Comments' : showPerformanceNotes ? 'Performance Notes' : 'Recent Evaluations & Feedback'}</h3>
+            <div className="feedback-list">
+              {gradesState.length === 0 ? (
+                <p className="empty-state">No evaluations available.</p>
+              ) : (
+                gradesState.map((grade) => (
+                  <div key={grade.id} className={`feedback-card ${grade.status}`}>
+                    <div className="feedback-header">
+                      <div>
+                        <h4>Project: {grade.projectId}</h4>
+                        <p>Student ID: {grade.studentId}</p>
+                      </div>
+                      <span className={`status-badge ${grade.status}`}>{grade.status}</span>
+                    </div>
+
+                    <div className="feedback-scores">
+                      <div className="score-item">
+                        <span>Proposal:</span>
+                        <strong>{grade.proposalMark}</strong>
+                      </div>
+                      <div className="score-item">
+                        <span>Progress:</span>
+                        <strong>{grade.progressMark}</strong>
+                      </div>
+                      <div className="score-item">
+                        <span>Implementation:</span>
+                        <strong>{grade.implementationMark}</strong>
+                      </div>
+                      <div className="score-item">
+                        <span>Final Submission:</span>
+                        <strong>{grade.finalSubmissionMark}</strong>
+                      </div>
+                      <div className="score-item total">
+                        <span>Total:</span>
+                        <strong>{grade.totalMark}/{grade.maxMark}</strong>
+                      </div>
+                    </div>
+
+                    {grade.comments && <p className="feedback-comment"><strong>{showPerformanceNotes ? 'Performance Note:' : 'Feedback:'}</strong> {grade.comments}</p>}
+
+                    {grade.feedbackList && grade.feedbackList.length > 0 && (
+                      <div className="feedback-history">
+                        <h5>Feedback History:</h5>
+                        {grade.feedbackList.map((fb) => (
+                          <div key={fb.id} className="feedback-item">
+                            <p>{fb.text}</p>
+                            <p className="feedback-meta">Added on {fb.addedDate} by {fb.addedBy}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {showProvideFeedback && (
+                      <div className="evaluation-actions">
+                        <select
+                          value={grade.status}
+                          onChange={(e) => handleUpdateEvaluationStatus(grade.id, e.target.value)}
+                          className="form-select"
+                          style={{ maxWidth: '200px' }}
+                        >
+                          <option value="in-progress">In Progress</option>
+                          <option value="graded">Graded</option>
+                          <option value="approved">Approved</option>
+                          <option value="completed">Completed</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+
+        {showEvaluationStatus && (
+          <>
+            <h3>Evaluation Status</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Student</th>
+                  <th>Current Status</th>
+                  <th>Update</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gradesState.map((grade) => (
+                  <tr key={grade.id}>
+                    <td>{grade.projectId}</td>
+                    <td>{grade.studentId}</td>
+                    <td>{grade.status}</td>
+                    <td>
+                      <select
+                        value={grade.status}
+                        onChange={(e) => handleUpdateEvaluationStatus(grade.id, e.target.value)}
+                        className="form-select"
+                      >
+                        <option value="in-progress">In Progress</option>
+                        <option value="graded">Graded</option>
+                        <option value="approved">Approved</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
       </div>
     </section>
   );
