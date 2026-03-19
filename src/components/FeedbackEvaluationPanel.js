@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 
 function FeedbackEvaluationPanel({ grades, facultyId }) {
   const [gradesState, setGradesState] = useState(

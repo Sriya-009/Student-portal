@@ -942,6 +942,71 @@ th {
   margin-block-end: 6px;
 }
 
+.role-summary-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+
+.role-summary-card h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.role-summary-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.simplified-card {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.simple-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.simple-list.muted {
+  color: var(--text-secondary);
+}
+
+.admin-operations-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-operation-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.admin-operation-card h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.admin-operation-card ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
 
 body.dark-mode .calendar-cell.empty {
   background: #0f172a;
@@ -1009,6 +1074,11 @@ body.dark-mode .pill.badge {
   .three-cols,
   .four-cols,
   .chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .simplified-card,
+  .admin-operations-grid {
     grid-template-columns: 1fr;
   }
 

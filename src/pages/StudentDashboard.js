@@ -9,6 +9,19 @@ import NotificationPanel from '../components/NotificationPanel';
 import { students, submissionEvents } from '../data/portalData';
 import '../styles/dashboard.css';
 
+const studentQuickActions = [
+  'Work on assigned projects',
+  'Track deadlines and submissions',
+  'Upload files and project updates',
+  'Review faculty feedback and grades'
+];
+
+const studentSupportFlow = [
+  'Student handles project tasks and submissions',
+  'Faculty reviews, guides, and evaluates work',
+  'Admin manages system access, records, and platform operations'
+];
+
 function StudentDashboard() {
   const [activeView, setActiveView] = useState('projects');
   const [workspaceAction, setWorkspaceAction] = useState(null);
@@ -67,6 +80,34 @@ function StudentDashboard() {
         </aside>
 
         <main className="portal-main">
+          <section className="page-head">
+            <h1>{activeView === 'projects' ? 'Student Workspace' : 'Submission Calendar'}</h1>
+            <p>
+              {activeView === 'projects'
+                ? 'Focus on project execution while faculty and admin handle review and platform operations.'
+                : 'Track all due dates and submission events in one place.'}
+            </p>
+          </section>
+
+          <section className="role-summary-card simplified-card">
+            <div>
+              <h2>What You Need To Do</h2>
+              <ul className="simple-list">
+                {studentQuickActions.map((action) => (
+                  <li key={action}>{action}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h2>How It Works</h2>
+              <ul className="simple-list muted">
+                {studentSupportFlow.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </section>
+
           <NotificationPanel 
             events={submissionEvents}
             studentId={currentStudent.rollNumber}
@@ -80,11 +121,6 @@ function StudentDashboard() {
             />
           ) : (
             <>
-              <section className="page-head">
-                <h1>Event Submission Calendar</h1>
-                <p>Track due dates, quizzes, and assignment uploads in one monthly view</p>
-              </section>
-
               <SubmissionCalendar events={submissionEvents} />
             </>
           )}
