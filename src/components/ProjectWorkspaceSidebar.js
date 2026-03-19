@@ -37,18 +37,16 @@ const sections = [
     id: 'file-handling',
     title: 'File Handling',
     items: [
-      { label: 'Upload project files (documents, code, PPT)', action: 'file-upload' },
-      { label: 'Update/replace files', action: 'file-update' },
-      { label: 'View/download files', action: 'file-view' }
+      { label: 'View all the files uploaded', action: 'file-view-all' },
+      { label: 'Edit file', action: 'file-edit' },
+      { label: 'Remove file', action: 'file-remove' }
     ]
   },
   {
     id: 'submission',
     title: 'Submission',
     items: [
-      { label: 'Submit project work', action: 'submit-work' },
-      { label: 'Submit final project', action: 'submit-final' },
-      { label: 'Ensure submission before deadline', action: 'submit-before-deadline' }
+      { label: 'Submit final project', action: 'submit-final' }
     ]
   },
   {

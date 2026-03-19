@@ -831,6 +831,46 @@ th {
   font-size: 32px;
 }
 
+/* Slightly compact calendar for student dashboard */
+.student-shell .calendar-card {
+  padding: 14px;
+  gap: 10px;
+}
+
+.student-shell .calendar-head h3 {
+  font-size: 36px;
+}
+
+.student-shell .calendar-course-select,
+.student-shell .calendar-add-btn {
+  font-size: 20px;
+}
+
+.student-shell .calendar-month-head h4 {
+  font-size: 40px;
+}
+
+.student-shell .calendar-nav-btn {
+  font-size: 24px;
+}
+
+.student-shell .calendar-weekday {
+  font-size: 24px;
+  padding: 8px 4px;
+}
+
+.student-shell .calendar-cell {
+  min-block-size: 145px;
+}
+
+.student-shell .calendar-day-number {
+  font-size: 30px;
+}
+
+.student-shell .calendar-footer-link {
+  font-size: 26px;
+}
+
 /* Legacy classes retained for teacher/progress pages */
 .navbar {
   display: flex;

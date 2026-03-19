@@ -24,6 +24,8 @@ function ProjectManagement({ studentId, workspaceAction }) {
   const [workspaceNotice, setWorkspaceNotice] = useState('');
   const [showAddTeamMember, setShowAddTeamMember] = useState(false);
   const [newTeamMemberName, setNewTeamMemberName] = useState('');
+  const [newTeamMemberStudentId, setNewTeamMemberStudentId] = useState('');
+  const [newTeamMemberEmail, setNewTeamMemberEmail] = useState('');
   const [showEditSuggestion, setShowEditSuggestion] = useState(false);
   const [editSuggestion, setEditSuggestion] = useState({
     taskId: '',
@@ -141,14 +143,26 @@ function ProjectManagement({ studentId, workspaceAction }) {
 
   const handleAddTeamMember = (e) => {
     e.preventDefault();
-    if (!newTeamMemberName.trim() || !selectedProject) {
-      alert('Please enter team member name');
+    if (!newTeamMemberName.trim() || !newTeamMemberStudentId.trim() || !newTeamMemberEmail.trim() || !selectedProject) {
+      alert('Please enter team member name, student ID, and email');
+      return;
+    }
+
+    const selected = projects.find((p) => p.id === selectedProject);
+    const normalizedStudentId = newTeamMemberStudentId.trim().toUpperCase();
+    const normalizedEmail = newTeamMemberEmail.trim().toLowerCase();
+
+    const alreadyExists = selected?.teamMembers?.some(
+      (member) => member.id.toLowerCase() === normalizedStudentId.toLowerCase() || (member.email || '').toLowerCase() === normalizedEmail
+    );
+    if (alreadyExists) {
+      alert('Team member with this student ID or email already exists in this project.');
       return;
     }
 
     const updatedProjects = projects.map((p) => {
       if (p.id === selectedProject) {
-        const newMemberId = `MEMBER-${Date.now()}`;
+        const newMemberId = normalizedStudentId;
         return {
           ...p,
           teamMemberIds: [...p.teamMemberIds, newMemberId],
@@ -157,7 +171,8 @@ function ProjectManagement({ studentId, workspaceAction }) {
             {
               id: newMemberId,
               name: newTeamMemberName,
-              role: 'Contributor'
+              role: 'Contributor',
+              email: newTeamMemberEmail.trim()
             }
           ]
         };
@@ -167,6 +182,8 @@ function ProjectManagement({ studentId, workspaceAction }) {
 
     setProjects(updatedProjects);
     setNewTeamMemberName('');
+    setNewTeamMemberStudentId('');
+    setNewTeamMemberEmail('');
     setShowAddTeamMember(false);
     alert(`✓ ${newTeamMemberName} added to the project!`);
   };
@@ -283,16 +300,14 @@ function ProjectManagement({ studentId, workspaceAction }) {
         setShowEditSuggestion(true);
         setWorkspaceNotice('Send edit suggestions for tasks.');
         break;
-      case 'file-upload':
-      case 'file-update':
-      case 'file-view':
+      case 'file-view-all':
+      case 'file-edit':
+      case 'file-remove':
         openProjectView(leadProject, 'files');
         setWorkspaceMode(workspaceAction.id);
-        setWorkspaceNotice('File and submission management opened.');
+        setWorkspaceNotice('File management workspace opened.');
         break;
-      case 'submit-work':
       case 'submit-final':
-      case 'submit-before-deadline':
         openProjectView(leadProject, 'files');
         setWorkspaceMode(workspaceAction.id);
         setWorkspaceNotice('Submission workspace opened.');
@@ -480,7 +495,11 @@ function ProjectManagement({ studentId, workspaceAction }) {
                           <div className="member-avatar">{member.name.substring(0, 1)}</div>
                           <div className="member-info">
                             <strong>{member.name}</strong>
-                            <p>{member.role}</p>
+                            <p>
+                              {member.role}
+                              {member.id ? ` | ${member.id}` : ''}
+                              {member.email ? ` | ${member.email}` : ''}
+                            </p>
                           </div>
                           {selectedProjectData.ownerId === studentId && (
                             <button
@@ -1048,8 +1067,39 @@ function ProjectManagement({ studentId, workspaceAction }) {
               required
             />
 
+            <label htmlFor="memberStudentId">Student ID</label>
+            <input
+              id="memberStudentId"
+              type="text"
+              placeholder="Enter student ID (e.g., STU005)"
+              value={newTeamMemberStudentId}
+              onChange={(e) => setNewTeamMemberStudentId(e.target.value)}
+              required
+            />
+
+            <label htmlFor="memberEmail">Student Email</label>
+            <input
+              id="memberEmail"
+              type="email"
+              placeholder="Enter student email"
+              value={newTeamMemberEmail}
+              onChange={(e) => setNewTeamMemberEmail(e.target.value)}
+              required
+            />
+
             <div className="modal-actions">
-              <button type="button" className="outline-btn" onClick={() => setShowAddTeamMember(false)}>Cancel</button>
+              <button
+                type="button"
+                className="outline-btn"
+                onClick={() => {
+                  setShowAddTeamMember(false);
+                  setNewTeamMemberName('');
+                  setNewTeamMemberStudentId('');
+                  setNewTeamMemberEmail('');
+                }}
+              >
+                Cancel
+              </button>
               <button type="submit" className="primary-dark-btn">Add Member</button>
             </div>
           </form>

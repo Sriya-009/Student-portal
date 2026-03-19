@@ -5,6 +5,8 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [fileVersion, setFileVersion] = useState('');
+  const [editFileId, setEditFileId] = useState(null);
+  const [editDescription, setEditDescription] = useState('');
 
   const isProjectLead = projectLeadId === currentUserId;
   const projectFilesList = files.filter((f) => f.projectId === projectId);
@@ -12,10 +14,11 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
 
   useEffect(() => {
     if (!actionMode) return;
-    if ((actionMode === 'file-upload' || actionMode === 'file-update' || actionMode === 'submit-work') && isProjectLead && !isProjectSubmitted) {
-      setShowUploadForm(true);
+    if (actionMode === 'file-edit' && projectFilesList.length > 0) {
+      setEditFileId(projectFilesList[0].id);
+      setEditDescription(projectFilesList[0].description || '');
     }
-  }, [actionMode, isProjectLead, isProjectSubmitted]);
+  }, [actionMode, projectFilesList]);
 
   const fileStats = useMemo(() => {
     const totalFiles = projectFilesList.length;
@@ -97,6 +100,50 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
     alert(`Downloaded: ${file.fileName}`);
   };
 
+  const handleStartEditFile = (file) => {
+    setEditFileId(file.id);
+    setEditDescription(file.description || '');
+  };
+
+  const handleSaveEditFile = () => {
+    if (!editFileId) return;
+    if (!editDescription.trim()) {
+      alert('Please enter file description/version notes.');
+      return;
+    }
+
+    const updatedFiles = files.map((file) => (
+      file.id === editFileId
+        ? {
+            ...file,
+            description: editDescription.trim(),
+            updatedDate: new Date().toISOString().split('T')[0]
+          }
+        : file
+    ));
+
+    setFiles(updatedFiles);
+    onFilesUpdate?.(updatedFiles);
+    setEditFileId(null);
+    setEditDescription('');
+  };
+
+  const handleRemoveFile = (fileId) => {
+    const targetFile = files.find((file) => file.id === fileId);
+    if (!targetFile) return;
+
+    const confirmed = window.confirm(`Remove file "${targetFile.fileName}"?`);
+    if (!confirmed) return;
+
+    const updatedFiles = files.filter((file) => file.id !== fileId);
+    setFiles(updatedFiles);
+    onFilesUpdate?.(updatedFiles);
+    if (editFileId === fileId) {
+      setEditFileId(null);
+      setEditDescription('');
+    }
+  };
+
   const getFileType = (fileName) => {
     const ext = fileName.split('.').pop().toLowerCase();
     if (['doc', 'docx', 'pdf', 'txt'].includes(ext)) return 'document';
@@ -165,16 +212,14 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
 
         {actionMode ? (
           <p className="workspace-notice">
-            {actionMode === 'file-upload' && 'Upload project deliverables such as docs, code, and slides.'}
-            {actionMode === 'file-update' && 'Upload a new file version to replace or update existing work.'}
-            {actionMode === 'file-view' && 'Browse and download submitted project files.'}
-            {actionMode === 'submit-work' && 'Submit project work by ensuring required files are uploaded.'}
+            {actionMode === 'file-view-all' && 'Browse and download all uploaded project files.'}
+            {actionMode === 'file-edit' && 'Edit file description/version notes for uploaded files.'}
+            {actionMode === 'file-remove' && 'Remove unwanted files from this project.'}
             {actionMode === 'submit-final' && 'Finalize and lock submission when everything is ready.'}
-            {actionMode === 'submit-before-deadline' && 'Complete submission before the deadline to avoid late status.'}
           </p>
         ) : null}
 
-        {isProjectLead && !isProjectSubmitted && (actionMode === 'submit-work' || actionMode === 'submit-final' || actionMode === 'submit-before-deadline') ? (
+        {isProjectLead && !isProjectSubmitted && actionMode === 'submit-final' ? (
           <section className="final-submission" style={{ marginBottom: '16px' }}>
             <div className="submission-info">
               <h4>Submission Actions</h4>
@@ -278,6 +323,24 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
                     >
                       ↓ Download
                     </button>
+                    {isProjectLead ? (
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={() => handleStartEditFile(file)}
+                      >
+                        Edit
+                      </button>
+                    ) : null}
+                    {isProjectLead ? (
+                      <button
+                        type="button"
+                        className="btn-danger"
+                        onClick={() => handleRemoveFile(file.id)}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -285,6 +348,35 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
           </div>
         )}
       </section>
+
+      {isProjectLead && editFileId ? (
+        <section className="final-submission" style={{ marginTop: '12px' }}>
+          <div className="submission-info">
+            <h4>Edit File Details</h4>
+            <p>Update description/version notes for the selected file.</p>
+          </div>
+          <textarea
+            className="form-textarea"
+            rows="3"
+            value={editDescription}
+            onChange={(event) => setEditDescription(event.target.value)}
+            placeholder="Update file notes"
+          />
+          <div className="button-group" style={{ marginTop: '10px' }}>
+            <button type="button" className="btn-primary" onClick={handleSaveEditFile}>Save File Edit</button>
+            <button
+              type="button"
+              className="outline-btn"
+              onClick={() => {
+                setEditFileId(null);
+                setEditDescription('');
+              }}
+            >
+              Cancel Edit
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       {!isProjectSubmitted && projectFilesList.length > 0 && (
         <section className="final-submission">
