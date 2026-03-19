@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import SubmissionCalendar from '../components/SubmissionCalendar';
 import ProjectManagement from '../components/ProjectManagement';
 import ThemeToggle from '../components/ThemeToggle';
+import ProjectWorkspaceSidebar from '../components/ProjectWorkspaceSidebar';
 import { students, submissionEvents } from '../data/portalData';
 import '../styles/dashboard.css';
 
@@ -43,20 +44,16 @@ function StudentDashboard() {
 
       <div className="portal-layout">
         <aside className="portal-sidebar">
-          <button
-            type="button"
-            className={`sidebar-action ${activeView === 'projects' ? 'active' : ''}`}
-            onClick={() => setActiveView('projects')}
-          >
-            My Projects
-          </button>
-          <button
-            type="button"
-            className={`sidebar-action ${activeView === 'calendar' ? 'active' : ''}`}
-            onClick={() => setActiveView('calendar')}
-          >
-            Submission Calendar
-          </button>
+          <ProjectWorkspaceSidebar
+            onSectionSelect={(sectionId) => {
+              if (sectionId === 'my-projects') {
+                setActiveView('projects');
+              }
+              if (sectionId === 'submission') {
+                setActiveView('calendar');
+              }
+            }}
+          />
         </aside>
 
         <main className="portal-main">

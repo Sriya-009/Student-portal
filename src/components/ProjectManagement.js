@@ -3,7 +3,6 @@ import { bTechProjects, projectChats, projectTasks, projectFiles } from '../data
 import TaskManagement from './TaskManagement';
 import FileManagement from './FileManagement';
 import ProjectFilter from './ProjectFilter';
-import ProjectWorkspaceSidebar from './ProjectWorkspaceSidebar';
 
 function ProjectManagement({ studentId }) {
   const [projects, setProjects] = useState(bTechProjects);
@@ -104,13 +103,14 @@ function ProjectManagement({ studentId }) {
 
   return (
     <div className="project-management">
-      <section className="workspace-top-section">
-        <ProjectWorkspaceSidebar />
-        <div className="workspace-top-actions">
-          <button type="button" className="primary-dark-btn" onClick={() => setShowCreateForm(true)}>
-            + Create New Project
-          </button>
+      <section className="page-head page-head-row">
+        <div>
+          <h1>My Projects</h1>
+          <p>View and manage your B.Tech projects</p>
         </div>
+        <button type="button" className="primary-dark-btn" onClick={() => setShowCreateForm(true)}>
+          + Create New Project
+        </button>
       </section>
 
       <div className="project-grid">

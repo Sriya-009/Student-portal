@@ -71,7 +71,7 @@ const sections = [
   }
 ];
 
-function ProjectWorkspaceSidebar() {
+function ProjectWorkspaceSidebar({ onSectionSelect }) {
   const [openSections, setOpenSections] = useState({
     'my-projects': true,
     'task-management': true
@@ -98,7 +98,10 @@ function ProjectWorkspaceSidebar() {
               <button
                 type="button"
                 className="workspace-menu-title"
-                onClick={() => toggleSection(section.id)}
+                onClick={() => {
+                  toggleSection(section.id);
+                  onSectionSelect?.(section.id);
+                }}
               >
                 <span>{section.title}</span>
                 <span className="workspace-chevron">{isOpen ? '▾' : '▸'}</span>
