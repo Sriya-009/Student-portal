@@ -248,6 +248,24 @@ function ProjectManagement({ studentId, workspaceAction }) {
         setShowCreateForm(true);
         setWorkspaceNotice('Create a new project using the form.');
         break;
+      case 'delete-project': {
+        const targetProject = allStudentProjects.find((p) => p.id === selectedProject) || firstProject;
+        if (!targetProject) {
+          setWorkspaceNotice('No project found to delete.');
+          break;
+        }
+
+        const confirmed = window.confirm(`Delete project "${targetProject.name}"? This cannot be undone.`);
+        if (!confirmed) {
+          setWorkspaceNotice('Project deletion cancelled.');
+          break;
+        }
+
+        setProjects((prev) => prev.filter((p) => p.id !== targetProject.id));
+        setSelectedProject((prev) => (prev === targetProject.id ? null : prev));
+        setWorkspaceNotice(`Project deleted: ${targetProject.name}`);
+        break;
+      }
       case 'view-assigned':
         setProjectFilter('all');
         setWorkspaceNotice('Showing all assigned projects.');
@@ -329,7 +347,7 @@ function ProjectManagement({ studentId, workspaceAction }) {
       default:
         break;
     }
-  }, [workspaceAction, projects, studentId]);
+  }, [workspaceAction, projects, studentId, selectedProject]);
 
   useEffect(() => {
     if (!selectedProject && studentProjects.length > 0) {

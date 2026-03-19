@@ -17,6 +17,11 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
     if (actionMode === 'file-edit' && projectFilesList.length > 0) {
       setEditFileId(projectFilesList[0].id);
       setEditDescription(projectFilesList[0].description || '');
+      return;
+    }
+    if (actionMode !== 'file-edit') {
+      setEditFileId(null);
+      setEditDescription('');
     }
   }, [actionMode, projectFilesList]);
 
@@ -323,7 +328,7 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
                     >
                       ↓ Download
                     </button>
-                    {isProjectLead ? (
+                    {isProjectLead && actionMode === 'file-edit' ? (
                       <button
                         type="button"
                         className="secondary-btn"
@@ -332,7 +337,7 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
                         Edit
                       </button>
                     ) : null}
-                    {isProjectLead ? (
+                    {isProjectLead && actionMode === 'file-remove' ? (
                       <button
                         type="button"
                         className="btn-danger"
@@ -349,7 +354,7 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
         )}
       </section>
 
-      {isProjectLead && editFileId ? (
+      {isProjectLead && editFileId && actionMode === 'file-edit' ? (
         <section className="final-submission" style={{ marginTop: '12px' }}>
           <div className="submission-info">
             <h4>Edit File Details</h4>
@@ -377,22 +382,6 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
           </div>
         </section>
       ) : null}
-
-      {!isProjectSubmitted && projectFilesList.length > 0 && (
-        <section className="final-submission">
-          <div className="submission-info">
-            <h4>Project Submission</h4>
-            <p>Once submitted, no further changes can be made. Ensure all files are correct before submitting.</p>
-          </div>
-          <button
-            type="button"
-            className="submit-btn"
-            onClick={handleFinalSubmission}
-          >
-            🔒 Submit Final Project
-          </button>
-        </section>
-      )}
 
       {isProjectSubmitted && (
         <section className="submission-complete">

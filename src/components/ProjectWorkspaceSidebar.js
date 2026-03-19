@@ -6,7 +6,7 @@ const sections = [
     title: 'My Projects',
     items: [
       { label: 'Create a new project', action: 'create-project' },
-      { label: 'View assigned projects', action: 'view-assigned' },
+      { label: 'Delete project', action: 'delete-project' },
       { label: 'View project details (title, description, deadline)', action: 'view-details' },
       { label: 'Ongoing', action: 'filter-ongoing' },
       { label: 'Completed', action: 'filter-completed' }
@@ -24,11 +24,8 @@ const sections = [
   {
     id: 'task-management',
     title: 'Task Management',
-    subtitle: 'Only for project lead assigned by faculty',
     items: [
       { label: 'Create tasks within project', action: 'task-create' },
-      { label: 'Assign tasks to team members', action: 'task-assign' },
-      { label: 'View assigned tasks', action: 'task-view' },
       { label: 'Update task status (Pending / In Progress / Completed)', action: 'task-update' },
       { label: 'Track overall project progress', action: 'task-track' }
     ]
