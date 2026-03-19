@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import { bTechProjects, projectChats, projectTasks, projectFiles } from '../data/portalData';
 import TaskManagement from './TaskManagement';
 import FileManagement from './FileManagement';
-import ProjectFilter from './ProjectFilter';
 
 function ProjectManagement({ studentId, workspaceAction }) {
   const [projects, setProjects] = useState(bTechProjects);
@@ -206,12 +205,6 @@ function ProjectManagement({ studentId, workspaceAction }) {
 
       <div className="project-grid">
         <section className="project-left-column">
-          <ProjectFilter
-            projects={projects.filter((p) => p.teamMemberIds.includes(studentId))}
-            onFilterChange={setProjectFilter}
-            activeFilter={projectFilter}
-          />
-
           <section className="project-list">
             <h3>Your Projects</h3>
             {studentProjects.length === 0 ? (
