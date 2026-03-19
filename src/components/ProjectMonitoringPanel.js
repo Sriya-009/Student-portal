@@ -1,4 +1,8 @@
 function ProjectMonitoringPanel({ projects }) {
+  const handleViewDetails = (project) => {
+    alert(`Project: ${project.name}\nLead: ${project.teamMembers[0]?.name || 'N/A'}\nProgress: ${project.progressPercent}%\nDeadline: ${project.deadline}`);
+  };
+
   const ongoingProjects = projects.filter((p) => p.status === 'ongoing');
 
   return (
@@ -40,11 +44,11 @@ function ProjectMonitoringPanel({ projects }) {
               </div>
 
               <div className="deadline-info">
-                <p>📅 Deadline: <strong>{project.deadline}</strong></p>
-                <p>👥 Team Size: <strong>{project.teamMemberIds.length}</strong></p>
+                <p>Deadline: <strong>{project.deadline}</strong></p>
+                <p>Team Size: <strong>{project.teamMemberIds.length}</strong></p>
               </div>
 
-              <button className="btn-primary">View Details</button>
+              <button className="btn-primary" onClick={() => handleViewDetails(project)}>View Details</button>
             </div>
           ))}
         </div>

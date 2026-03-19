@@ -25,7 +25,7 @@ function TaskOversightPanel({ tasks, studentsMap }) {
     };
 
     setSuggestions([...suggestions, newSuggestion]);
-    alert(`✓ Suggestion added for "${showSuggestionForm.taskTitle}"`);
+    alert(`Suggestion added for "${showSuggestionForm.taskTitle}"`);
     setSuggestionText('');
     setShowSuggestionForm(null);
   };
@@ -63,7 +63,7 @@ function TaskOversightPanel({ tasks, studentsMap }) {
         {['pending', 'in_progress', 'completed'].map((status) => (
           <div key={status} className="task-section" style={{ marginBottom: '32px' }}>
             <h4 className={`task-status-header ${status}`}>
-              {status === 'in_progress' ? '⏳ In Progress' : status === 'pending' ? '📋 Pending' : '✓ Completed'}
+              {status === 'in_progress' ? 'In Progress' : status === 'pending' ? 'Pending' : 'Completed'}
               <span className="count">({tasksByStatus[status].length})</span>
             </h4>
 
@@ -86,7 +86,7 @@ function TaskOversightPanel({ tasks, studentsMap }) {
                       className="btn-secondary"
                       onClick={() => handleSuggestEdit(task.id, task.title)}
                     >
-                      ✎ Suggest Edit
+                      Suggest Edit
                     </button>
                   </div>
                 ))
@@ -125,7 +125,7 @@ function TaskOversightPanel({ tasks, studentsMap }) {
 
               <div className="button-group" style={{ marginTop: '16px' }}>
                 <button className="btn-success" onClick={handleSubmitSuggestion}>
-                  ✓ Submit Suggestion
+                  Submit Suggestion
                 </button>
                 <button
                   className="btn-secondary"

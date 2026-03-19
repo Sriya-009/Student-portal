@@ -12,7 +12,8 @@ import FeedbackEvaluationPanel from '../components/FeedbackEvaluationPanel';
 import GradingPanel from '../components/GradingPanel';
 import ReportsAnalyticsPanel from '../components/ReportsAnalyticsPanel';
 import FinalActionsPanel from '../components/FinalActionsPanel';
-import { mentors, projectProposals, bTechProjects, projectGrades, projectTasks, projectFiles } from '../data/portalData';
+import StudentSearchPanel from '../components/StudentSearchPanel';
+import { mentors, students, projectProposals, bTechProjects, projectGrades, projectTasks, projectFiles } from '../data/portalData';
 import '../styles/dashboard.css';
 
 function FacultyDashboard() {
@@ -43,6 +44,8 @@ function FacultyDashboard() {
         return <TaskOversightPanel tasks={projectTasks} studentsMap={getStudentMap()} />;
       case 'files':
         return <FileReviewPanel files={projectFiles} projects={bTechProjects} />;
+      case 'student-search':
+        return <StudentSearchPanel students={students} />;
       case 'communication':
         return <CommunicationPanel facultyId={currentFaculty.id} />;
       case 'feedback':
@@ -98,6 +101,8 @@ function FacultyDashboard() {
                 setActiveView('tasks');
               } else if (actionId.includes('file') || actionId.includes('submission')) {
                 setActiveView('files');
+              } else if (actionId.includes('student-search') || actionId.includes('student-id') || actionId.includes('student-dept')) {
+                setActiveView('student-search');
               } else if (actionId.includes('communicate') || actionId.includes('message')) {
                 setActiveView('communication');
               } else if (actionId.includes('feedback')) {
@@ -132,6 +137,7 @@ function getPageTitle(viewId) {
     monitoring: 'Project Monitoring',
     tasks: 'Task Oversight',
     files: 'File & Submission Review',
+    'student-search': 'Student Search',
     communication: 'Communication & Guidance',
     feedback: 'Feedback & Evaluation',
     grading: 'Grading & Evaluation',
@@ -147,6 +153,7 @@ function getPageDescription(viewId) {
     monitoring: 'Track ongoing projects and monitor progress',
     tasks: 'Review and supervise task management',
     files: 'Verify file submissions and track versions',
+    'student-search': 'Search students by ID number or department',
     communication: 'Communicate with students and provide guidance',
     feedback: 'Provide feedback and evaluate student work',
     grading: 'Assign marks and update evaluation status',

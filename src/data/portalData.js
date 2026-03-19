@@ -4,6 +4,7 @@ export const students = [
     rollNumber: 'STU001',
     name: 'Emma Johnson',
     email: 'emma.johnson@school.edu',
+    department: 'Computer Science',
     grade: '10th Grade',
     initials: 'E',
     phoneNumber: '+1-555-0101'
@@ -13,6 +14,7 @@ export const students = [
     rollNumber: 'STU002',
     name: 'Liam Chen',
     email: 'liam.chen@school.edu',
+    department: 'Electronics',
     grade: '11th Grade',
     initials: 'L',
     phoneNumber: '+1-555-0102'
@@ -22,6 +24,7 @@ export const students = [
     rollNumber: 'STU003',
     name: 'Sophia Martinez',
     email: 'sophia.martinez@school.edu',
+    department: 'Computer Science',
     grade: '12th Grade',
     initials: 'S',
     phoneNumber: '+1-555-0103'
@@ -31,6 +34,7 @@ export const students = [
     rollNumber: 'STU004',
     name: 'Noah Patel',
     email: 'noah.patel@school.edu',
+    department: 'Information Technology',
     grade: '9th Grade',
     initials: 'N',
     phoneNumber: '+1-555-0104'

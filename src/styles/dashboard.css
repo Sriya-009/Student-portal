@@ -400,6 +400,30 @@ body {
 }
 
 .showcase-card p,
+.student-search-controls {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.search-mode-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.search-mode-group .btn-secondary.active {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
+.student-results-table {
+  background: var(--bg-secondary);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
 .table-card p,
 .chart-card p {
   margin: 4px 0 0;
@@ -1007,6 +1031,56 @@ th {
   font-size: 13px;
 }
 
+.admin-control-panel .admin-operations-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-form-grid {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.admin-list {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-list-item {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-list-item p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.admin-log-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.admin-log-list p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.form-select.compact {
+  max-width: 130px;
+  height: 36px;
+  padding: 0 8px;
+}
+
 
 body.dark-mode .calendar-cell.empty {
   background: #0f172a;
@@ -1078,7 +1152,8 @@ body.dark-mode .pill.badge {
   }
 
   .simplified-card,
-  .admin-operations-grid {
+  .admin-operations-grid,
+  .admin-control-panel .admin-operations-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,20 +1,34 @@
 import { useState } from 'react';
 
 function ProjectApprovalPanel({ proposals, mentors }) {
+  const [proposalsState, setProposalsState] = useState(proposals);
   const [selectedProposal, setSelectedProposal] = useState(null);
   const [feedback, setFeedback] = useState('');
   const [selectedMentor, setSelectedMentor] = useState('');
 
   const handleApprove = (proposalId) => {
-    alert(`✓ Project proposal ${proposalId} approved! Mentor assignment pending.`);
+    const updated = proposalsState.map((proposal) => {
+      if (proposal.id !== proposalId) return proposal;
+      return {
+        ...proposal,
+        status: 'approved',
+        assignedMentor: selectedMentor || proposal.assignedMentor,
+        feedbackFromFaculty: feedback || 'Approved by faculty',
+        approvedDate: new Date().toISOString().split('T')[0]
+      };
+    });
+    setProposalsState(updated);
+    alert(`Project proposal ${proposalId} approved.`);
   };
 
   const handleReject = (proposalId) => {
-    alert(`✗ Project proposal ${proposalId} rejected. Feedback sent to student.`);
+    const updated = proposalsState.filter((proposal) => proposal.id !== proposalId);
+    setProposalsState(updated);
+    alert(`Project proposal ${proposalId} rejected.`);
   };
 
-  const pendingProposals = proposals.filter((p) => p.status === 'pending');
-  const approvedProposals = proposals.filter((p) => p.status === 'approved');
+  const pendingProposals = proposalsState.filter((p) => p.status === 'pending');
+  const approvedProposals = proposalsState.filter((p) => p.status === 'approved');
 
   return (
     <section className="faculty-panel">
@@ -75,13 +89,17 @@ function ProjectApprovalPanel({ proposals, mentors }) {
                       <button
                         className="btn-success"
                         onClick={() => {
+                          if (!selectedMentor) {
+                            alert('Please select a mentor before approval.');
+                            return;
+                          }
                           handleApprove(proposal.id);
                           setSelectedProposal(null);
                           setFeedback('');
                           setSelectedMentor('');
                         }}
                       >
-                        ✓ Approve
+                        Approve
                       </button>
                       <button
                         className="btn-danger"
@@ -92,7 +110,7 @@ function ProjectApprovalPanel({ proposals, mentors }) {
                           setSelectedMentor('');
                         }}
                       >
-                        ✗ Reject
+                        Reject
                       </button>
                       <button
                         className="btn-secondary"
@@ -123,7 +141,7 @@ function ProjectApprovalPanel({ proposals, mentors }) {
             <div key={proposal.id} className="proposal-card approved">
               <div className="proposal-header">
                 <h4>{proposal.title}</h4>
-                <span className="badge approved">✓ Approved</span>
+                <span className="badge approved">Approved</span>
               </div>
               <p className="proposal-desc">{proposal.description}</p>
               <p className="proposal-meta">

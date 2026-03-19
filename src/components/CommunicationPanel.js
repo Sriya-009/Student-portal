@@ -101,7 +101,7 @@ function CommunicationPanel({ facultyId }) {
                     className="form-textarea"
                   />
                   <button className="btn-primary" onClick={handleSendMessage}>
-                    Send 📤
+                    Send
                   </button>
                 </div>
               </>

@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import SubmissionCalendar from '../components/SubmissionCalendar';
+import AdminControlCenter from '../components/AdminControlCenter';
 import { useAuth } from '../context/AuthContext';
-import { submissionEvents } from '../data/portalData';
+import { students, mentors, bTechProjects, projectProposals, projectFiles, submissionEvents } from '../data/portalData';
 import '../styles/dashboard.css';
 
 function AdminDashboard() {
@@ -28,8 +29,22 @@ function AdminDashboard() {
 
       <main className="portal-main">
         <section className="page-head">
-          <h1>Submission Date Extension</h1>
-          <p>Admin can only extend existing submission dates. Faculty controls event creation and scheduling.</p>
+          <h1>Admin Dashboard</h1>
+          <p>Manage users, system operations, projects, monitoring, reports, notifications, security, maintenance, and final actions.</p>
+        </section>
+
+        <AdminControlCenter
+          students={students}
+          mentors={mentors}
+          projects={bTechProjects}
+          projectProposals={projectProposals}
+          files={projectFiles}
+          submissionEvents={submissionEvents}
+        />
+
+        <section className="page-head">
+          <h2>Deadline Management Calendar</h2>
+          <p>Extend active submission deadlines when required.</p>
         </section>
 
         <SubmissionCalendar

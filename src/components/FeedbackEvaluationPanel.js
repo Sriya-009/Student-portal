@@ -38,7 +38,7 @@ function FeedbackEvaluationPanel({ grades, facultyId }) {
     });
 
     setGradesState(updatedGrades);
-    alert('✓ Feedback added successfully!');
+    alert('Feedback added successfully.');
     setFeedback('');
     setSelectedGrade(null);
   };
@@ -48,7 +48,7 @@ function FeedbackEvaluationPanel({ grades, facultyId }) {
       g.id === gradeId ? { ...g, status: newStatus } : g
     );
     setGradesState(updatedGrades);
-    alert(`✓ Evaluation status updated to "${newStatus}"`);
+    alert(`Evaluation status updated to "${newStatus}"`);
   };
 
   const handleClearFeedback = () => {
@@ -105,7 +105,7 @@ function FeedbackEvaluationPanel({ grades, facultyId }) {
 
           <div className="button-group">
             <button className="btn-success" onClick={handleAddFeedback}>
-              💬 Add Feedback
+              Add Feedback
             </button>
             <button className="btn-secondary" onClick={handleClearFeedback}>
               Clear

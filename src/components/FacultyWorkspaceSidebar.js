@@ -46,6 +46,15 @@ const facultySections = [
     ]
   },
   {
+    id: 'student-search',
+    title: 'Student Search',
+    items: [
+      { label: 'Search by ID Number', actionId: 'student-id-search' },
+      { label: 'Search by Department', actionId: 'student-dept-search' },
+      { label: 'View All Students', actionId: 'student-search-all' }
+    ]
+  },
+  {
     id: 'communication',
     title: 'Communication',
     items: [

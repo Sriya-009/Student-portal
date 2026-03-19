@@ -35,7 +35,7 @@ Deadline: ${p.deadline}
 
 === END OF REPORT ===
 `;
-    alert('✓ Full report generated!\n\n' + report.substring(0, 300) + '...');
+    alert('Full report generated.\n\n' + report.substring(0, 300) + '...');
   };
 
   const handleExportCSV = () => {
@@ -57,11 +57,11 @@ Deadline: ${p.deadline}
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
-    alert('✓ CSV Report exported successfully!');
+    alert('CSV report exported successfully.');
   };
 
   const handleEmailReport = () => {
-    alert('✓ Report sent to admin@institution.edu\n\nIncluding:\n- Performance summary\n- Grade distribution\n- Project status overview');
+    alert('Report sent to admin@institution.edu\n\nIncluding:\n- Performance summary\n- Grade distribution\n- Project status overview');
   };
 
   const totalProjects = projects.length;
@@ -167,13 +167,13 @@ Deadline: ${p.deadline}
 
         <div className="button-group" style={{ marginTop: '24px' }}>
           <button className="btn-success" onClick={handleGenerateReport}>
-            📊 Generate Full Report
+            Generate Full Report
           </button>
           <button className="btn-primary" onClick={handleExportCSV}>
-            📥 Export to CSV
+            Export to CSV
           </button>
           <button className="btn-secondary" onClick={handleEmailReport}>
-            📧 Email Report
+            Email Report
           </button>
         </div>
       </div>

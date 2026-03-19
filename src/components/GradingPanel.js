@@ -57,7 +57,7 @@ function GradingPanel({ grades, projects }) {
     );
 
     setGradesState(updatedGrades);
-    alert(`✓ Grades updated successfully! Total: ${totalMark}/100`);
+    alert(`Grades updated successfully. Total: ${totalMark}/100`);
     setSelectedGrade(null);
     setMarks({ proposalMark: 0, progressMark: 0, implementationMark: 0, finalSubmissionMark: 0 });
   };
@@ -73,8 +73,8 @@ function GradingPanel({ grades, projects }) {
     
     const grade = gradesState.find((g) => g.id === gradeId);
     alert(approvedSubmissions.has(gradeId) 
-      ? `✓ Approval removed for ${grade.projectId}` 
-      : `✓ Final submission approved for ${grade.projectId}!`);
+      ? `Approval removed for ${grade.projectId}` 
+      : `Final submission approved for ${grade.projectId}.`);
   };
 
   const handleResetMarks = () => {
@@ -190,12 +190,12 @@ function GradingPanel({ grades, projects }) {
 
                 <div className="mark-total">
                   <strong>Total: {totalMarks}/100</strong>
-                  {totalMarks > 100 && <span className="warning">⚠️ Exceeds maximum</span>}
+                  {totalMarks > 100 && <span className="warning">Exceeds maximum</span>}
                 </div>
 
                 <div className="button-group">
                   <button className="btn-success" onClick={handleUpdateMarks}>
-                    ✓ Save Marks
+                    Save Marks
                   </button>
                   <button className="btn-secondary" onClick={handleResetMarks}>
                     Cancel
@@ -216,7 +216,7 @@ function GradingPanel({ grades, projects }) {
                     <div className="grade-info">
                       <strong>{grade.projectId}</strong>
                       <p>Student: {grade.studentId}</p>
-                      <p className="grade-status">{grade.status === 'graded' ? '✓ Graded' : '⏳ Pending'}</p>
+                      <p className="grade-status">{grade.status === 'graded' ? 'Graded' : 'Pending'}</p>
                     </div>
                     <div className="grade-score">
                       <strong>{grade.totalMark}/{grade.maxMark}</strong>
@@ -232,7 +232,7 @@ function GradingPanel({ grades, projects }) {
                       className={`btn-secondary ${approvedSubmissions.has(grade.id) ? 'approved' : ''}`}
                       onClick={() => handleApproveSubmission(grade.id)}
                     >
-                      {approvedSubmissions.has(grade.id) ? '✓ Approved' : 'Approve'}
+                      {approvedSubmissions.has(grade.id) ? 'Approved' : 'Approve'}
                     </button>
                   </div>
                 ))
