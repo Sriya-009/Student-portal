@@ -4,6 +4,8 @@ function TaskOversightPanel({ tasks, studentsMap, activeAction }) {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestionForm, setShowSuggestionForm] = useState(null);
   const [suggestionText, setSuggestionText] = useState('');
+  const [modifySearch, setModifySearch] = useState('');
+  const [distributionSearch, setDistributionSearch] = useState('');
 
   const handleSuggestEdit = (taskId, taskTitle) => {
     setShowSuggestionForm({ taskId, taskTitle });
@@ -50,6 +52,15 @@ function TaskOversightPanel({ tasks, studentsMap, activeAction }) {
     }, {})
   );
 
+  const filteredTaskDistribution = taskDistribution.filter((entry) => {
+    const query = distributionSearch.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      entry.studentName.toLowerCase().includes(query)
+      || entry.studentId.toLowerCase().includes(query)
+    );
+  });
+
   const overdueTasks = tasks.filter((task) => {
     return task.status !== 'completed' && new Date(task.deadline) < new Date();
   });
@@ -57,6 +68,17 @@ function TaskOversightPanel({ tasks, studentsMap, activeAction }) {
   const avgContribution = tasks.length > 0
     ? Math.round(tasks.reduce((sum, task) => sum + task.contributionPercent, 0) / tasks.length)
     : 0;
+
+  const filteredModifyTasks = tasks.filter((task) => {
+    const query = modifySearch.trim().toLowerCase();
+    if (!query) return true;
+    return (
+      task.title.toLowerCase().includes(query)
+      || task.description.toLowerCase().includes(query)
+      || task.assignedToName.toLowerCase().includes(query)
+      || String(task.deadline).toLowerCase().includes(query)
+    );
+  });
 
   const showReview = activeAction === 'task-review' || activeAction === 'tasks-overview' || !activeAction;
   const showDistribution = activeAction === 'task-distribution';
@@ -117,8 +139,19 @@ function TaskOversightPanel({ tasks, studentsMap, activeAction }) {
         {showDistribution && (
           <>
             <h3>Task Distribution</h3>
+            <div className="task-search-row" style={{ marginBottom: '12px' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Search by student name or ID"
+                value={distributionSearch}
+                onChange={(event) => setDistributionSearch(event.target.value)}
+              />
+            </div>
             <div className="tasks-list">
-              {taskDistribution.map((entry) => (
+              {filteredTaskDistribution.length === 0 ? (
+                <p className="empty-state">No students found for this search.</p>
+              ) : filteredTaskDistribution.map((entry) => (
                 <div key={entry.studentId} className="task-item">
                   <div className="task-main">
                     <h5>{entry.studentName}</h5>
@@ -136,8 +169,19 @@ function TaskOversightPanel({ tasks, studentsMap, activeAction }) {
         {showModify && (
           <>
             <h3>Suggest Modifications</h3>
+            <div className="task-search-row" style={{ marginBottom: '12px' }}>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Search tasks by title, assignee, or due date"
+                value={modifySearch}
+                onChange={(event) => setModifySearch(event.target.value)}
+              />
+            </div>
             <div className="tasks-list">
-              {tasks.map((task) => (
+              {filteredModifyTasks.length === 0 ? (
+                <p className="empty-state">No tasks found for this search.</p>
+              ) : filteredModifyTasks.map((task) => (
                 <div key={task.id} className="task-item">
                   <div className="task-main">
                     <h5>{task.title}</h5>

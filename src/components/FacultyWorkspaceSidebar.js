@@ -79,9 +79,7 @@ const facultySections = [
     items: [
       { label: 'Assign Marks', actionId: 'grade-assign' },
       { label: 'Update Grades', actionId: 'grade-update' },
-      { label: 'Approve Submission', actionId: 'grade-approve' },
-      { label: 'Evaluation Summary', actionId: 'grade-summary' },
-      { label: 'Grade Distribution', actionId: 'grade-distribution' }
+      { label: 'Approve Submission', actionId: 'grade-approve' }
     ]
   },
   {
@@ -97,13 +95,13 @@ const facultySections = [
   },
   {
     id: 'final-actions',
-    title: 'Final Actions',
+    title: 'Project Closure',
     items: [
-      { label: 'Mark Complete', actionId: 'final-mark-complete' },
-      { label: 'Publish Results', actionId: 'final-publish' },
-      { label: 'Archive Projects', actionId: 'final-archive' },
-      { label: 'Cleanup Tasks', actionId: 'final-cleanup' },
-      { label: 'Final Review', actionId: 'final-review' }
+      { label: 'Complete Projects', actionId: 'final-mark-complete' },
+      { label: 'Publish Final Results', actionId: 'final-publish' },
+      { label: 'Archive Completed Projects', actionId: 'final-archive' },
+      { label: 'Close Outstanding Tasks', actionId: 'final-cleanup' },
+      { label: 'Final Compliance Review', actionId: 'final-review' }
     ]
   }
 ];

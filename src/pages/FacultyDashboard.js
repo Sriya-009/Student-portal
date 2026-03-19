@@ -153,7 +153,7 @@ function getPageTitle(viewId) {
     feedback: 'Feedback & Evaluation',
     grading: 'Grading & Evaluation',
     reports: 'Reports & Analytics',
-    'final-actions': 'Final Actions'
+    'final-actions': 'Project Closure'
   };
   return titles[viewId] || 'Faculty Dashboard';
 }
@@ -169,7 +169,7 @@ function getPageDescription(viewId) {
     feedback: 'Provide feedback and evaluate student work',
     grading: 'Assign marks and update evaluation status',
     reports: 'Generate performance reports and analytics',
-    'final-actions': 'Mark projects complete and archive data'
+    'final-actions': 'Complete, publish, archive, and close project operations'
   };
   return descriptions[viewId] || 'Manage your assigned projects and students';
 }

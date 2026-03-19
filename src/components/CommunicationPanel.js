@@ -3,6 +3,7 @@ import { useState } from 'react';
 function CommunicationPanel({ facultyId, activeAction }) {
   const [message, setMessage] = useState('');
   const [selectedStudent, setSelectedStudent] = useState('');
+  const [chatSearch, setChatSearch] = useState('');
   const [notificationText, setNotificationText] = useState('');
   const [guidanceText, setGuidanceText] = useState('');
   const [discussionText, setDiscussionText] = useState('');
@@ -75,6 +76,20 @@ function CommunicationPanel({ facultyId, activeAction }) {
 
   const unreadCount = messages.filter((m) => !m.read).length;
   const activeConversations = Array.from(new Set(messages.map((m) => (m.from === facultyId ? m.to : m.from)).filter(Boolean)));
+  const filteredConversations = activeConversations.filter((studentId) => {
+    const query = chatSearch.trim().toLowerCase();
+    if (!query) return true;
+
+    const lastMsg = messages
+      .filter((m) => m.from === studentId || m.to === studentId)
+      .slice(-1)[0];
+
+    return (
+      studentId.toLowerCase().includes(query)
+      || (lastMsg?.fromName || '').toLowerCase().includes(query)
+      || (lastMsg?.text || '').toLowerCase().includes(query)
+    );
+  });
 
   const showNotifications = activeAction === 'communicate-notify';
   const showGuidance = activeAction === 'communicate-guidance';
@@ -109,8 +124,18 @@ function CommunicationPanel({ facultyId, activeAction }) {
           <div className="communication-layout">
             <div className="chat-list">
               <h3>Conversations</h3>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Search by student ID or message"
+                value={chatSearch}
+                onChange={(e) => setChatSearch(e.target.value)}
+                style={{ marginBottom: '10px' }}
+              />
               <div className="chat-items">
-                {activeConversations.map((studentId) => {
+                {filteredConversations.length === 0 ? (
+                  <p className="empty-state">No conversations found for this search.</p>
+                ) : filteredConversations.map((studentId) => {
                   const lastMsg = messages
                     .filter((m) => m.from === studentId || m.to === studentId)
                     .slice(-1)[0];
