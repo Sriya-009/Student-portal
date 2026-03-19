@@ -52,7 +52,8 @@ function Captcha({ onVerify }) {
           borderRadius: '4px',
           fontFamily: 'monospace',
           textDecoration: 'line-through',
-          transform: 'skewY(-10deg)',
+          textDecorationThickness: '2px',
+          transform: 'none',
           userSelect: 'none'
         }}>
           {captchaCode}
