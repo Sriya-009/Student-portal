@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
-function TaskManagement({ projectId, projectLeadId, currentUserId, teamMembers, projectTasks, onTasksUpdate, projectName }) {
+function TaskManagement({ projectId, projectLeadId, currentUserId, teamMembers, projectTasks, onTasksUpdate, projectName, actionMode }) {
   const [tasks, setTasks] = useState(projectTasks || []);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newTask, setNewTask] = useState({
@@ -12,6 +12,13 @@ function TaskManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
 
   const isProjectLead = projectLeadId === currentUserId;
   const projectTasksFiltered = tasks.filter((t) => t.projectId === projectId);
+
+  useEffect(() => {
+    if (!actionMode) return;
+    if ((actionMode === 'task-create' || actionMode === 'task-assign') && isProjectLead) {
+      setShowCreateForm(true);
+    }
+  }, [actionMode, isProjectLead]);
 
   const taskStats = useMemo(() => {
     const pending = projectTasksFiltered.filter((t) => t.status === 'pending').length;
@@ -108,6 +115,16 @@ function TaskManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
           + Create New Task
         </button>
       </div>
+
+      {actionMode ? (
+        <p className="workspace-notice">
+          {actionMode === 'task-create' && 'Create a new task for this project.'}
+          {actionMode === 'task-assign' && 'Assign tasks to team members from the task list.'}
+          {actionMode === 'task-view' && 'Viewing current assigned project tasks.'}
+          {actionMode === 'task-update' && 'Update task status for ongoing work.'}
+          {actionMode === 'task-track' && 'Track task-level progress and contribution.'}
+        </p>
+      ) : null}
 
       <section className="task-stats">
         <article className="task-stat-card">

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { bTechProjects, projectChats, projectTasks, projectFiles } from '../data/portalData';
+import { bTechProjects, projectChats, projectTasks, projectFiles, projectProposals, projectGrades } from '../data/portalData';
 import TaskManagement from './TaskManagement';
 import FileManagement from './FileManagement';
 
@@ -30,8 +30,26 @@ function ProjectManagement({ studentId, workspaceAction }) {
     suggestion: ''
   });
   const [feedbackCorrections, setFeedbackCorrections] = useState('');
+  const [correctionHistory, setCorrectionHistory] = useState([]);
   const [docNote, setDocNote] = useState('');
   const [docEntries, setDocEntries] = useState([]);
+  const [docRecord, setDocRecord] = useState({
+    title: '',
+    category: 'report'
+  });
+  const [docRegistry, setDocRegistry] = useState([]);
+  const [presentationDraft, setPresentationDraft] = useState({
+    title: '',
+    date: '',
+    points: ''
+  });
+  const [presentationPlans, setPresentationPlans] = useState([]);
+  const [organizeChecklist, setOrganizeChecklist] = useState({
+    reports: false,
+    presentation: false,
+    sourceCode: false,
+    references: false
+  });
   const [workspaceMode, setWorkspaceMode] = useState('default');
 
   const studentProjects = useMemo(
@@ -48,6 +66,15 @@ function ProjectManagement({ studentId, workspaceAction }) {
   const selectedProjectData = selectedProject ? projects.find((p) => p.id === selectedProject) : null;
   const selectedProjectChatMessages = selectedProject
     ? projectMessages.filter((msg) => msg.projectId === selectedProject).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+    : [];
+  const selectedProjectProposal = selectedProjectData
+    ? projectProposals.find((proposal) => proposal.projectId === selectedProjectData.id && proposal.studentId === studentId)
+    : null;
+  const selectedProjectGrade = selectedProjectData
+    ? projectGrades.find((grade) => grade.projectId === selectedProjectData.id && grade.studentId === studentId)
+    : null;
+  const selectedProjectFiles = selectedProjectData
+    ? files.filter((file) => file.projectId === selectedProjectData.id)
     : [];
 
   const handleCreateProject = (e) => {
@@ -262,6 +289,13 @@ function ProjectManagement({ studentId, workspaceAction }) {
         openProjectView(leadProject, 'files');
         setWorkspaceMode(workspaceAction.id);
         setWorkspaceNotice('File and submission management opened.');
+        break;
+      case 'submit-work':
+      case 'submit-final':
+      case 'submit-before-deadline':
+        openProjectView(leadProject, 'files');
+        setWorkspaceMode(workspaceAction.id);
+        setWorkspaceNotice('Submission workspace opened.');
         break;
       case 'feedback-view':
       case 'feedback-check':
@@ -483,6 +517,7 @@ function ProjectManagement({ studentId, workspaceAction }) {
                   teamMembers={selectedProjectData.teamMembers}
                   projectTasks={tasks}
                   onTasksUpdate={setTasks}
+                  actionMode={workspaceMode}
                   projectName={selectedProjectData.name}
                 />
               )}
@@ -495,6 +530,7 @@ function ProjectManagement({ studentId, workspaceAction }) {
                   teamMembers={selectedProjectData.teamMembers}
                   projectFiles={files}
                   onFilesUpdate={setFiles}
+                  actionMode={workspaceMode}
                   projectName={selectedProjectData.name}
                 />
               )}
@@ -541,10 +577,48 @@ function ProjectManagement({ studentId, workspaceAction }) {
                   )}
 
                   <div className="info-section">
+                    <h4>Mentor Feedback</h4>
+                    <p>
+                      {selectedProjectProposal?.feedbackFromFaculty || selectedProjectGrade?.comments || 'No mentor feedback available yet.'}
+                    </p>
+                    <p>
+                      Last evaluation date: {selectedProjectGrade?.evaluationDate || 'Not evaluated'}
+                    </p>
+                  </div>
+
+                  <div className="info-section">
                     <h4>Current Evaluation Summary</h4>
                     <p>Project progress: {selectedProjectData.progressPercent}%</p>
                     <p>Status: {selectedProjectData.status}</p>
                   </div>
+
+                  {workspaceMode === 'feedback-check' && (
+                    <div className="info-section">
+                      <h4>Marks Breakdown</h4>
+                      {selectedProjectGrade ? (
+                        <div className="contributions-grid">
+                          <div className="contribution-card">
+                            <div className="contribution-head"><strong>Proposal</strong></div>
+                            <div className="contribution-stats"><span>{selectedProjectGrade.proposalMark} / 20</span></div>
+                          </div>
+                          <div className="contribution-card">
+                            <div className="contribution-head"><strong>Progress</strong></div>
+                            <div className="contribution-stats"><span>{selectedProjectGrade.progressMark} / 20</span></div>
+                          </div>
+                          <div className="contribution-card">
+                            <div className="contribution-head"><strong>Implementation</strong></div>
+                            <div className="contribution-stats"><span>{selectedProjectGrade.implementationMark} / 30</span></div>
+                          </div>
+                          <div className="contribution-card">
+                            <div className="contribution-head"><strong>Final Submission</strong></div>
+                            <div className="contribution-stats"><span>{selectedProjectGrade.finalSubmissionMark} / 30</span></div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p>Marks are not published yet.</p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="info-section">
                     <h4>Correction / Improvement Note</h4>
@@ -564,6 +638,14 @@ function ProjectManagement({ studentId, workspaceAction }) {
                             alert('Please enter a correction note.');
                             return;
                           }
+                          setCorrectionHistory((prev) => [
+                            {
+                              id: `CORR-${Date.now()}`,
+                              note: feedbackCorrections,
+                              createdAt: new Date().toLocaleString()
+                            },
+                            ...prev
+                          ]);
                           alert('Correction note submitted to mentor.');
                           setFeedbackCorrections('');
                         }}
@@ -571,6 +653,22 @@ function ProjectManagement({ studentId, workspaceAction }) {
                         Submit Correction
                       </button>
                     </div>
+                  </div>
+
+                  <div className="info-section">
+                    <h4>Correction History</h4>
+                    {correctionHistory.length === 0 ? (
+                      <p>No corrections submitted yet.</p>
+                    ) : (
+                      <div className="suggestions-list">
+                        {correctionHistory.map((entry) => (
+                          <div key={entry.id} className="suggestion-item">
+                            <p>{entry.note}</p>
+                            <p className="suggestion-meta">{entry.createdAt}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -622,6 +720,177 @@ function ProjectManagement({ studentId, workspaceAction }) {
                       </button>
                     </div>
                   </div>
+
+                  {workspaceMode === 'docs-maintain' && (
+                    <div className="info-section">
+                      <h4>Maintain Reports & Documents</h4>
+                      <div className="modal-card" style={{ padding: '12px' }}>
+                        <label htmlFor="docTitle">Document Title</label>
+                        <input
+                          id="docTitle"
+                          type="text"
+                          value={docRecord.title}
+                          onChange={(e) => setDocRecord((prev) => ({ ...prev, title: e.target.value }))}
+                          placeholder="e.g., Sprint 3 Report"
+                        />
+                        <label htmlFor="docCategory">Category</label>
+                        <select
+                          id="docCategory"
+                          value={docRecord.category}
+                          onChange={(e) => setDocRecord((prev) => ({ ...prev, category: e.target.value }))}
+                        >
+                          <option value="report">Report</option>
+                          <option value="document">Document</option>
+                          <option value="minutes">Meeting Minutes</option>
+                        </select>
+                        <div className="button-group" style={{ marginTop: '10px' }}>
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            onClick={() => {
+                              if (!docRecord.title.trim()) {
+                                alert('Please enter a document title.');
+                                return;
+                              }
+                              setDocRegistry((prev) => [
+                                {
+                                  id: `REG-${Date.now()}`,
+                                  title: docRecord.title,
+                                  category: docRecord.category,
+                                  createdAt: new Date().toLocaleString()
+                                },
+                                ...prev
+                              ]);
+                              setDocRecord({ title: '', category: 'report' });
+                            }}
+                          >
+                            Add Record
+                          </button>
+                        </div>
+                      </div>
+
+                      {docRegistry.length > 0 ? (
+                        <div className="suggestions-list" style={{ marginTop: '12px' }}>
+                          {docRegistry.map((entry) => (
+                            <div key={entry.id} className="suggestion-item">
+                              <p>{entry.title}</p>
+                              <p className="suggestion-meta">{entry.category} | {entry.createdAt}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p>No report/document records added yet.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {workspaceMode === 'docs-prepare' && (
+                    <div className="info-section">
+                      <h4>Presentation Preparation</h4>
+                      <div className="modal-card" style={{ padding: '12px' }}>
+                        <label htmlFor="presentationTitle">Presentation Title</label>
+                        <input
+                          id="presentationTitle"
+                          type="text"
+                          value={presentationDraft.title}
+                          onChange={(e) => setPresentationDraft((prev) => ({ ...prev, title: e.target.value }))}
+                          placeholder="e.g., Final Demo"
+                        />
+                        <label htmlFor="presentationDate">Presentation Date</label>
+                        <input
+                          id="presentationDate"
+                          type="date"
+                          value={presentationDraft.date}
+                          onChange={(e) => setPresentationDraft((prev) => ({ ...prev, date: e.target.value }))}
+                        />
+                        <label htmlFor="presentationPoints">Key Points</label>
+                        <textarea
+                          id="presentationPoints"
+                          rows="3"
+                          value={presentationDraft.points}
+                          onChange={(e) => setPresentationDraft((prev) => ({ ...prev, points: e.target.value }))}
+                          placeholder="Mention top points for the presentation"
+                        />
+                        <div className="button-group" style={{ marginTop: '10px' }}>
+                          <button
+                            type="button"
+                            className="btn-primary"
+                            onClick={() => {
+                              if (!presentationDraft.title.trim()) {
+                                alert('Please enter a presentation title.');
+                                return;
+                              }
+                              setPresentationPlans((prev) => [
+                                {
+                                  id: `PRESENT-${Date.now()}`,
+                                  ...presentationDraft,
+                                  createdAt: new Date().toLocaleString()
+                                },
+                                ...prev
+                              ]);
+                              setPresentationDraft({ title: '', date: '', points: '' });
+                            }}
+                          >
+                            Save Presentation Plan
+                          </button>
+                        </div>
+                      </div>
+
+                      {presentationPlans.length > 0 ? (
+                        <div className="suggestions-list" style={{ marginTop: '12px' }}>
+                          {presentationPlans.map((plan) => (
+                            <div key={plan.id} className="suggestion-item">
+                              <p>{plan.title}</p>
+                              <p className="suggestion-meta">Date: {plan.date || 'TBD'} | {plan.createdAt}</p>
+                              <p>{plan.points || 'No points added yet.'}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p>No presentation plans yet.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {workspaceMode === 'docs-organize' && (
+                    <div className="info-section">
+                      <h4>Organize Project Files</h4>
+                      <p>Current files linked to this project: {selectedProjectFiles.length}</p>
+                      <div className="button-group" style={{ marginBottom: '10px' }}>
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => setOrganizeChecklist((prev) => ({ ...prev, reports: !prev.reports }))}
+                        >
+                          {organizeChecklist.reports ? 'Unmark Reports Organized' : 'Mark Reports Organized'}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => setOrganizeChecklist((prev) => ({ ...prev, presentation: !prev.presentation }))}
+                        >
+                          {organizeChecklist.presentation ? 'Unmark Presentation Organized' : 'Mark Presentation Organized'}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => setOrganizeChecklist((prev) => ({ ...prev, sourceCode: !prev.sourceCode }))}
+                        >
+                          {organizeChecklist.sourceCode ? 'Unmark Source Code Organized' : 'Mark Source Code Organized'}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-btn"
+                          onClick={() => setOrganizeChecklist((prev) => ({ ...prev, references: !prev.references }))}
+                        >
+                          {organizeChecklist.references ? 'Unmark References Organized' : 'Mark References Organized'}
+                        </button>
+                      </div>
+                      <p>
+                        Reports: {organizeChecklist.reports ? 'Completed' : 'Pending'} | Presentation: {organizeChecklist.presentation ? 'Completed' : 'Pending'} | Source Code: {organizeChecklist.sourceCode ? 'Completed' : 'Pending'} | References: {organizeChecklist.references ? 'Completed' : 'Pending'}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="info-section">
                     <h4>Documentation History</h4>

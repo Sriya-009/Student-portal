@@ -166,6 +166,33 @@ export function resendOtp(otpSessionId) {
   };
 }
 
+export function requestPasswordReset(identifier) {
+  const normalizedIdentifier = (identifier || '').trim().toLowerCase();
+
+  if (!normalizedIdentifier) {
+    throw new Error('Enter your roll number, email, or admin id first.');
+  }
+
+  const studentExists = studentCredentials.some(
+    (item) => item.rollNumber.toLowerCase() === normalizedIdentifier
+  ) || students.some((item) => item.email.toLowerCase() === normalizedIdentifier);
+
+  const facultyExists = facultyCredentials.some(
+    (item) => item.facultyId.toLowerCase() === normalizedIdentifier
+  ) || mentors.some((item) => item.email.toLowerCase() === normalizedIdentifier);
+
+  const staffExists = users.some((item) => item.email.toLowerCase() === normalizedIdentifier);
+
+  if (!studentExists && !facultyExists && !staffExists) {
+    throw new Error('No account found for this identifier.');
+  }
+
+  return {
+    success: true,
+    message: 'Password reset instructions sent to your registered contact.'
+  };
+}
+
 export function signupUser(name, email, password, role = 'student') {
   if (role === 'student') {
     const nextId = students.length + 1;

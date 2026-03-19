@@ -160,6 +160,26 @@
   text-align: center;
 }
 
+.forgot-password-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.forgot-password-btn {
+  border: none;
+  background: transparent;
+  color: #1d4ed8;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.forgot-password-btn:hover {
+  color: #1e3a8a;
+}
+
 .demo-box {
   background: #eef4ff;
   border-radius: 12px;
@@ -200,6 +220,14 @@
 
 body.dark-mode .success-message {
   color: #22c55e;
+}
+
+body.dark-mode .forgot-password-btn {
+  color: #93c5fd;
+}
+
+body.dark-mode .forgot-password-btn:hover {
+  color: #dbeafe;
 }
 
 body.dark-mode .auth-page {

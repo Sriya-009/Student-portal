@@ -9,10 +9,11 @@ function Login() {
   const [otpCode, setOtpCode] = useState('');
   const [otpSession, setOtpSession] = useState(null);
   const [error, setError] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendSuccess, setResendSuccess] = useState(false);
-  const { login, verifyOtp, resendOtp } = useAuth();
+  const { login, verifyOtp, resendOtp, forgotPassword } = useAuth();
   const navigate = useNavigate();
 
   // Cooldown timer effect
@@ -31,6 +32,7 @@ function Login() {
   const handleSubmit = (event) => {
     event.preventDefault();
     setError('');
+    setResetMessage('');
 
     try {
       if (otpSession) {
@@ -52,6 +54,19 @@ function Login() {
       setError(loginError.message);
     }
   };
+
+  const handleForgotPassword = () => {
+    setError('');
+    setResetMessage('');
+    try {
+      const result = forgotPassword(identifier);
+      setResetMessage(result.message);
+    } catch (forgotError) {
+      setError(forgotError.message || 'Unable to process password reset.');
+    }
+  };
+
+  const showForgotPassword = !otpSession && /invalid credentials/i.test(error);
 
   const resetOtpStep = () => {
     setOtpSession(null);
@@ -84,11 +99,9 @@ function Login() {
 
       <form className="auth-form" onSubmit={handleSubmit}>
         <h2>Sign In</h2>
-        <p className="auth-subtext">
-          {otpSession
-            ? `OTP sent to registered phone ${otpSession.maskedPhone}`
-            : 'Sign in with your credentials and role will be identified automatically'}
-        </p>
+        {otpSession ? (
+          <p className="auth-subtext">OTP sent to registered phone {otpSession.maskedPhone}</p>
+        ) : null}
 
         {otpSession ? (
           <>
@@ -130,6 +143,16 @@ function Login() {
         )}
 
         {error ? <p className="error">{error}</p> : null}
+
+        {showForgotPassword ? (
+          <div className="forgot-password-wrap">
+            <button type="button" className="forgot-password-btn" onClick={handleForgotPassword}>
+              Forgot Password?
+            </button>
+          </div>
+        ) : null}
+
+        {resetMessage ? <p className="success-message">{resetMessage}</p> : null}
 
         {resendSuccess ? <p className="success-message">OTP resent successfully.</p> : null}
 

@@ -51,19 +51,12 @@ function StudentDashboard() {
               if (sectionId === 'my-projects') {
                 setActiveView('projects');
               }
-              if (sectionId === 'submission') {
-                setActiveView('calendar');
-              }
-              if (sectionId === 'team-collaboration' || sectionId === 'task-management' || sectionId === 'file-handling' || sectionId === 'feedback-evaluation' || sectionId === 'documentation') {
+              if (sectionId === 'submission' || sectionId === 'team-collaboration' || sectionId === 'task-management' || sectionId === 'file-handling' || sectionId === 'feedback-evaluation' || sectionId === 'documentation') {
                 setActiveView('projects');
               }
             }}
             onActionSelect={(actionId) => {
-              if (actionId.startsWith('submit-')) {
-                setActiveView('calendar');
-              } else {
-                setActiveView('projects');
-              }
+              setActiveView('projects');
               setWorkspaceAction({ id: actionId, timestamp: Date.now() });
             }}
           />

@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 
-function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, projectFiles, onFilesUpdate, projectName }) {
+function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, projectFiles, onFilesUpdate, projectName, actionMode }) {
   const [files, setFiles] = useState(projectFiles || []);
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -8,6 +8,14 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
 
   const isProjectLead = projectLeadId === currentUserId;
   const projectFilesList = files.filter((f) => f.projectId === projectId);
+  const isProjectSubmitted = projectFilesList.some((f) => f.isSubmitted);
+
+  useEffect(() => {
+    if (!actionMode) return;
+    if ((actionMode === 'file-upload' || actionMode === 'file-update' || actionMode === 'submit-work') && isProjectLead && !isProjectSubmitted) {
+      setShowUploadForm(true);
+    }
+  }, [actionMode, isProjectLead, isProjectSubmitted]);
 
   const fileStats = useMemo(() => {
     const totalFiles = projectFilesList.length;
@@ -144,8 +152,6 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
     );
   }
 
-  const isProjectSubmitted = projectFilesList.some((f) => f.isSubmitted);
-
   return (
     <div className="file-management">
       <div className="file-header">
@@ -156,6 +162,42 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
           </button>
         )}
       </div>
+
+        {actionMode ? (
+          <p className="workspace-notice">
+            {actionMode === 'file-upload' && 'Upload project deliverables such as docs, code, and slides.'}
+            {actionMode === 'file-update' && 'Upload a new file version to replace or update existing work.'}
+            {actionMode === 'file-view' && 'Browse and download submitted project files.'}
+            {actionMode === 'submit-work' && 'Submit project work by ensuring required files are uploaded.'}
+            {actionMode === 'submit-final' && 'Finalize and lock submission when everything is ready.'}
+            {actionMode === 'submit-before-deadline' && 'Complete submission before the deadline to avoid late status.'}
+          </p>
+        ) : null}
+
+        {isProjectLead && !isProjectSubmitted && (actionMode === 'submit-work' || actionMode === 'submit-final' || actionMode === 'submit-before-deadline') ? (
+          <section className="final-submission" style={{ marginBottom: '16px' }}>
+            <div className="submission-info">
+              <h4>Submission Actions</h4>
+              <p>Use quick actions to complete your submission flow.</p>
+            </div>
+            <div className="button-group">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => setShowUploadForm(true)}
+              >
+                Upload / Update Files
+              </button>
+              <button
+                type="button"
+                className="submit-btn"
+                onClick={handleFinalSubmission}
+              >
+                Submit Final Project
+              </button>
+            </div>
+          </section>
+        ) : null}
 
       <section className="file-stats">
         <article className="file-stat-card">
