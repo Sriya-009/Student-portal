@@ -10,6 +10,7 @@ function Login() {
   const [otpSession, setOtpSession] = useState(null);
   const [error, setError] = useState('');
   const [resetMessage, setResetMessage] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendSuccess, setResendSuccess] = useState(false);
@@ -33,6 +34,7 @@ function Login() {
     event.preventDefault();
     setError('');
     setResetMessage('');
+    setShowForgotPassword(false);
 
     try {
       if (otpSession) {
@@ -52,12 +54,16 @@ function Login() {
       routeByRole(loggedInUser.role);
     } catch (loginError) {
       setError(loginError.message);
+      if (!otpSession) {
+        setShowForgotPassword(true);
+      }
     }
   };
 
   const handleForgotPassword = () => {
     setError('');
     setResetMessage('');
+    setShowForgotPassword(false);
     try {
       const result = forgotPassword(identifier);
       setResetMessage(result.message);
@@ -66,12 +72,11 @@ function Login() {
     }
   };
 
-  const showForgotPassword = !otpSession && /invalid credentials/i.test(error);
-
   const resetOtpStep = () => {
     setOtpSession(null);
     setOtpCode('');
     setError('');
+    setShowForgotPassword(false);
   };
 
   const handleResendOtp = async () => {
@@ -144,7 +149,7 @@ function Login() {
 
         {error ? <p className="error">{error}</p> : null}
 
-        {showForgotPassword ? (
+        {showForgotPassword && !otpSession ? (
           <div className="forgot-password-wrap">
             <button type="button" className="forgot-password-btn" onClick={handleForgotPassword}>
               Forgot Password?

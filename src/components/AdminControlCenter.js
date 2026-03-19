@@ -22,6 +22,7 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
   const [newUser, setNewUser] = useState({ id: '', name: '', email: '', department: '', role: 'student' });
   const [editUserId, setEditUserId] = useState(null);
   const [editUser, setEditUser] = useState({ name: '', email: '', department: '' });
+  const [studentIdSearch, setStudentIdSearch] = useState('');
 
   const [proposalsState, setProposalsState] = useState(projectProposals);
   const [projectsState, setProjectsState] = useState(projects);
@@ -145,6 +146,17 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
     () => proposalsState.filter((proposal) => proposal.status === 'pending'),
     [proposalsState]
   );
+
+  const filteredUsers = useMemo(() => {
+    const query = studentIdSearch.trim().toLowerCase();
+    if (!query) {
+      return users.slice(0, 6);
+    }
+
+    return users
+      .filter((user) => user.role === 'student' && user.id.toLowerCase().includes(query))
+      .slice(0, 6);
+  }, [users, studentIdSearch]);
 
   const approveProposal = (proposalId) => {
     setProposalsState((prev) => prev.map((proposal) => (
@@ -333,7 +345,21 @@ function AdminControlCenter({ students, mentors, projects, projectProposals, fil
             </div>}
 
             {(userAction === 'user-approve-remove' || userAction === 'user-manage-roles' || userAction === 'user-management-overview') && <div className="admin-list">
-              {users.slice(0, 6).map((user) => (
+              <div className="admin-form-grid" style={{ marginBottom: '4px' }}>
+                <input
+                  className="form-input"
+                  placeholder="Search student by ID (e.g., STU001)"
+                  value={studentIdSearch}
+                  onChange={(e) => setStudentIdSearch(e.target.value)}
+                />
+                <button className="btn-secondary" onClick={() => setStudentIdSearch('')}>Clear Search</button>
+              </div>
+
+              {filteredUsers.length === 0 ? (
+                <p className="muted-line">No student found for ID: {studentIdSearch}</p>
+              ) : null}
+
+              {filteredUsers.map((user) => (
                 <div key={user.id} className="admin-list-item">
                   <div>
                     <strong>{user.id} - {user.name}</strong>
