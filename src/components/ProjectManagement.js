@@ -29,6 +29,10 @@ function ProjectManagement({ studentId, workspaceAction }) {
     taskId: '',
     suggestion: ''
   });
+  const [feedbackCorrections, setFeedbackCorrections] = useState('');
+  const [docNote, setDocNote] = useState('');
+  const [docEntries, setDocEntries] = useState([]);
+  const [workspaceMode, setWorkspaceMode] = useState('default');
 
   const studentProjects = useMemo(
     () => {
@@ -231,7 +235,9 @@ function ProjectManagement({ studentId, workspaceAction }) {
         setWorkspaceNotice('Team collaboration opened in project chat.');
         break;
       case 'team-coordinate-faculty':
-        setWorkspaceNotice('Use Submission section to coordinate with faculty deadlines.');
+        openProjectView(firstProject, 'feedback');
+        setWorkspaceMode('feedback-view');
+        setWorkspaceNotice('Faculty coordination opened in Feedback & Evaluation.');
         break;
       case 'task-create':
       case 'task-assign':
@@ -254,19 +260,22 @@ function ProjectManagement({ studentId, workspaceAction }) {
       case 'file-update':
       case 'file-view':
         openProjectView(leadProject, 'files');
+        setWorkspaceMode(workspaceAction.id);
         setWorkspaceNotice('File and submission management opened.');
         break;
       case 'feedback-view':
       case 'feedback-check':
       case 'feedback-corrections':
-        openProjectView(firstProject, 'overview');
-        setWorkspaceNotice('Feedback and evaluation area points to project overview for now.');
+        openProjectView(firstProject, 'feedback');
+        setWorkspaceMode(workspaceAction.id);
+        setWorkspaceNotice('Feedback and evaluation opened.');
         break;
       case 'docs-maintain':
       case 'docs-prepare':
       case 'docs-organize':
-        openProjectView(leadProject, 'files');
-        setWorkspaceNotice('Documentation actions are available in Files.');
+        openProjectView(leadProject, 'documentation');
+        setWorkspaceMode(workspaceAction.id);
+        setWorkspaceNotice('Documentation workspace opened.');
         break;
       default:
         break;
@@ -372,6 +381,26 @@ function ProjectManagement({ studentId, workspaceAction }) {
                 onClick={() => setActiveTab('chat')}
               >
                 Chat
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${activeTab === 'feedback' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('feedback');
+                  setWorkspaceMode('feedback-view');
+                }}
+              >
+                Feedback
+              </button>
+              <button
+                type="button"
+                className={`tab-btn ${activeTab === 'documentation' ? 'active' : ''}`}
+                onClick={() => {
+                  setActiveTab('documentation');
+                  setWorkspaceMode('docs-maintain');
+                }}
+              >
+                Documentation
               </button>
             </div>
 
@@ -495,6 +524,120 @@ function ProjectManagement({ studentId, workspaceAction }) {
                     />
                     <button type="submit" className="send-btn">Send</button>
                   </form>
+                </div>
+              )}
+
+              {activeTab === 'feedback' && (
+                <div className="project-chat">
+                  <h4>Feedback & Evaluation</h4>
+                  {workspaceMode === 'feedback-view' && (
+                    <p className="workspace-notice">View mentor feedback and guidance for this project.</p>
+                  )}
+                  {workspaceMode === 'feedback-check' && (
+                    <p className="workspace-notice">Check marks and grade progress shared by mentor.</p>
+                  )}
+                  {workspaceMode === 'feedback-corrections' && (
+                    <p className="workspace-notice">Submit correction requests or improvement updates.</p>
+                  )}
+
+                  <div className="info-section">
+                    <h4>Current Evaluation Summary</h4>
+                    <p>Project progress: {selectedProjectData.progressPercent}%</p>
+                    <p>Status: {selectedProjectData.status}</p>
+                  </div>
+
+                  <div className="info-section">
+                    <h4>Correction / Improvement Note</h4>
+                    <textarea
+                      className="form-textarea"
+                      rows="4"
+                      placeholder="Add corrections or clarification for mentor"
+                      value={feedbackCorrections}
+                      onChange={(e) => setFeedbackCorrections(e.target.value)}
+                    />
+                    <div className="button-group" style={{ marginTop: '10px' }}>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => {
+                          if (!feedbackCorrections.trim()) {
+                            alert('Please enter a correction note.');
+                            return;
+                          }
+                          alert('Correction note submitted to mentor.');
+                          setFeedbackCorrections('');
+                        }}
+                      >
+                        Submit Correction
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'documentation' && (
+                <div className="project-chat">
+                  <h4>Documentation Workspace</h4>
+                  {workspaceMode === 'docs-maintain' && (
+                    <p className="workspace-notice">Maintain reports and supporting documents.</p>
+                  )}
+                  {workspaceMode === 'docs-prepare' && (
+                    <p className="workspace-notice">Prepare presentation notes and review points.</p>
+                  )}
+                  {workspaceMode === 'docs-organize' && (
+                    <p className="workspace-notice">Organize project files and final folders.</p>
+                  )}
+
+                  <div className="info-section">
+                    <h4>Add Documentation Note</h4>
+                    <textarea
+                      className="form-textarea"
+                      rows="3"
+                      placeholder="Write documentation update"
+                      value={docNote}
+                      onChange={(e) => setDocNote(e.target.value)}
+                    />
+                    <div className="button-group" style={{ marginTop: '10px' }}>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => {
+                          if (!docNote.trim()) {
+                            alert('Please enter documentation notes.');
+                            return;
+                          }
+                          setDocEntries((prev) => [
+                            {
+                              id: `DOC-${Date.now()}`,
+                              text: docNote,
+                              mode: workspaceMode,
+                              createdAt: new Date().toLocaleString()
+                            },
+                            ...prev
+                          ]);
+                          setDocNote('');
+                        }}
+                      >
+                        Save Note
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="info-section">
+                    <h4>Documentation History</h4>
+                    {docEntries.length === 0 ? (
+                      <p>No documentation notes yet.</p>
+                    ) : (
+                      <div className="suggestions-list">
+                        {docEntries.map((entry) => (
+                          <div key={entry.id} className="suggestion-item">
+                            <p>{entry.text}</p>
+                            <p className="suggestion-meta">{entry.mode} | {entry.createdAt}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

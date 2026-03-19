@@ -54,6 +54,9 @@ function StudentDashboard() {
               if (sectionId === 'submission') {
                 setActiveView('calendar');
               }
+              if (sectionId === 'team-collaboration' || sectionId === 'task-management' || sectionId === 'file-handling' || sectionId === 'feedback-evaluation' || sectionId === 'documentation') {
+                setActiveView('projects');
+              }
             }}
             onActionSelect={(actionId) => {
               if (actionId.startsWith('submit-')) {
