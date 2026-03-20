@@ -222,6 +222,38 @@ export async function getAllProjects() {
   return payload.projects || [];
 }
 
+export async function createStudentProject({ name, description, deadline, ownerIdentifier, department }) {
+  const response = await fetch(`${API_BASE_URL}/api/projects`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name,
+      description,
+      deadline,
+      ownerIdentifier,
+      department
+    })
+  });
+
+  const payload = await parseResponse(response);
+  return payload.project;
+}
+
+export async function deleteStudentProject(projectId, ownerIdentifier) {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ ownerIdentifier })
+  });
+
+  const payload = await parseResponse(response);
+  return payload.deletedProjectId;
+}
+
 export async function assignStudentToFaculty(studentIdentifier, facultyIdentifier) {
   const response = await fetch(`${API_BASE_URL}/api/admin/assign-student-faculty`, {
     method: 'POST',

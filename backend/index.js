@@ -329,6 +329,25 @@ function toSafeProject(project) {
   };
 }
 
+function normalizeDateOrNull(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) {
+    return null;
+  }
+
+  return raw;
+}
+
+function generateProjectIdentifier() {
+  const ts = Date.now();
+  const random = Math.floor(Math.random() * 1000);
+  return `PRJ-${ts}-${String(random).padStart(3, '0')}`;
+}
+
 async function ensureProjectsTable() {
   const pool = getPool();
   await pool.query(`
@@ -601,6 +620,82 @@ app.get('/api/projects', async (_req, res) => {
       ok: true,
       projects: rows.map(toSafeProject)
     });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post('/api/projects', async (req, res) => {
+  const name = String(req.body?.name || '').trim();
+  const description = String(req.body?.description || '').trim();
+  const ownerIdentifier = String(req.body?.ownerIdentifier || '').trim();
+  const department = String(req.body?.department || '').trim();
+  const deadline = normalizeDateOrNull(req.body?.deadline);
+
+  if (!name) {
+    return res.status(400).json({ ok: false, error: 'Project name is required' });
+  }
+
+  if (!ownerIdentifier) {
+    return res.status(400).json({ ok: false, error: 'ownerIdentifier is required' });
+  }
+
+  try {
+    const pool = getPool();
+    const owner = await findUserByIdentifierOrEmail(pool, ownerIdentifier);
+
+    if (!owner || String(owner.role || '').toLowerCase() !== 'student') {
+      return res.status(404).json({ ok: false, error: 'Student owner account not found' });
+    }
+
+    const projectId = generateProjectIdentifier();
+    await pool.query(
+      `INSERT INTO projects (id, name, description, department, status, progress_percent, deadline, owner_identifier)
+       VALUES (?, ?, ?, ?, 'ongoing', 0, ?, ?)`,
+      [
+        projectId,
+        name,
+        description || null,
+        department || owner.department || null,
+        deadline,
+        owner.identifier
+      ]
+    );
+
+    const [rows] = await pool.query('SELECT * FROM projects WHERE id = ? LIMIT 1', [projectId]);
+    return res.status(201).json({ ok: true, project: toSafeProject(rows[0]) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.delete('/api/projects/:projectId', async (req, res) => {
+  const projectId = String(req.params.projectId || '').trim();
+  const ownerIdentifier = String(req.body?.ownerIdentifier || req.query?.ownerIdentifier || '').trim();
+
+  if (!projectId) {
+    return res.status(400).json({ ok: false, error: 'projectId is required' });
+  }
+
+  if (!ownerIdentifier) {
+    return res.status(400).json({ ok: false, error: 'ownerIdentifier is required' });
+  }
+
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query('SELECT * FROM projects WHERE id = ? LIMIT 1', [projectId]);
+    const project = rows[0];
+
+    if (!project) {
+      return res.status(404).json({ ok: false, error: 'Project not found' });
+    }
+
+    if (String(project.owner_identifier || '').toLowerCase() !== ownerIdentifier.toLowerCase()) {
+      return res.status(403).json({ ok: false, error: 'You can only delete your own projects' });
+    }
+
+    await pool.query('DELETE FROM projects WHERE id = ?', [projectId]);
+    return res.json({ ok: true, deletedProjectId: projectId });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message });
   }
