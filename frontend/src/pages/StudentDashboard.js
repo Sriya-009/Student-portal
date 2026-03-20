@@ -11,6 +11,7 @@ import '../styles/dashboard.css';
 
 function StudentDashboard() {
   const [workspaceAction, setWorkspaceAction] = useState(null);
+  const [showCalendar, setShowCalendar] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -25,6 +26,15 @@ function StudentDashboard() {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleActionSelect = (actionId) => {
+    setWorkspaceAction({ id: actionId, timestamp: Date.now() });
+    
+    // Show calendar for deadline-related actions
+    if (actionId?.includes('deadline') || actionId === 'view-upcoming') {
+      setShowCalendar(true);
+    }
   };
 
   return (
@@ -47,9 +57,7 @@ function StudentDashboard() {
         <aside className="portal-sidebar">
           <ProjectWorkspaceSidebar
             onSectionSelect={() => {}}
-            onActionSelect={(actionId) => {
-              setWorkspaceAction({ id: actionId, timestamp: Date.now() });
-            }}
+            onActionSelect={handleActionSelect}
           />
         </aside>
 
@@ -66,11 +74,13 @@ function StudentDashboard() {
             studentName={currentStudent.name}
           />
 
-          <SubmissionCalendar
-            events={submissionEvents}
-            title="Upcoming Deadlines"
-            showCourseFilter={false}
-          />
+          {showCalendar && (
+            <SubmissionCalendar
+              events={submissionEvents}
+              title="Upcoming Deadlines"
+              showCourseFilter={false}
+            />
+          )}
 
           <ProjectManagement
             studentId={currentStudent.rollNumber}
