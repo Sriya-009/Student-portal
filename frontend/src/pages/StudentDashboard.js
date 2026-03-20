@@ -9,7 +9,6 @@ import { getAllProjects } from '../services/authService';
 import '../styles/dashboard.css';
 
 function StudentDashboard() {
-  const [workspaceAction, setWorkspaceAction] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [projects, setProjects] = useState([]);
   const { user, logout } = useAuth();
@@ -57,8 +56,6 @@ function StudentDashboard() {
   };
 
   const handleActionSelect = (actionId) => {
-    setWorkspaceAction({ id: actionId, timestamp: Date.now() });
-    
     // Show calendar for deadline-related actions
     if (actionId?.includes('deadline') || actionId === 'view-upcoming') {
       setShowCalendar(true);
