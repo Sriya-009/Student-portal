@@ -110,7 +110,8 @@
 .profile-edit-form {
   display: grid;
   gap: 20px;
-  max-width: 600px;
+  inline-size: 100%;
+  max-inline-size: none;
 }
 
 .form-group {
