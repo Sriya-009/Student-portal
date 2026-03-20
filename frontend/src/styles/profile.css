@@ -29,6 +29,33 @@
   flex-shrink: 0;
 }
 
+.profile-avatar-wrap {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.profile-avatar-image {
+  inline-size: 120px;
+  block-size: 120px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #e0e3ed;
+}
+
+.profile-photo-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.upload-photo-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .profile-head h2 {
   margin: 0 0 8px 0;
   font-size: 32px;

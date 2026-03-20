@@ -2,9 +2,21 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { students, profileUpdateRequests } from '../data/portalData';
-import { getUserProfile } from '../services/authService';
+import { deleteProfilePhoto, getProfilePhotoUrl, getUserProfile, uploadProfilePhoto } from '../services/authService';
 import ThemeToggle from '../components/shared/ThemeToggle';
 import '../styles/profile.css';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+
+function toAbsolutePhotoUrl(photoUrl) {
+  if (!photoUrl) {
+    return '';
+  }
+  if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+    return photoUrl;
+  }
+  return `${API_BASE_URL}${photoUrl}`;
+}
 
 function StudentProfile() {
   const { user, logout } = useAuth();
@@ -14,6 +26,8 @@ function StudentProfile() {
   const [updateReason, setUpdateReason] = useState('');
   const [submitMessage, setSubmitMessage] = useState('');
   const [backendProfile, setBackendProfile] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [photoLoading, setPhotoLoading] = useState(false);
 
   const currentStudent = useMemo(() => {
     const profileIdentifier = user?.identifier || user?.rollNumber;
@@ -65,6 +79,70 @@ function StudentProfile() {
       isMounted = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const profileIdentifier = user?.identifier || user?.rollNumber;
+
+    if (!profileIdentifier) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    getProfilePhotoUrl(profileIdentifier)
+      .then((nextPhotoUrl) => {
+        if (isMounted) {
+          setPhotoUrl(nextPhotoUrl || '');
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPhotoUrl('');
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const handlePhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    const profileIdentifier = user?.identifier || studentProfile.rollNumber;
+
+    if (!file || !profileIdentifier) {
+      return;
+    }
+
+    try {
+      setPhotoLoading(true);
+      const nextPhotoUrl = await uploadProfilePhoto(profileIdentifier, file);
+      setPhotoUrl(nextPhotoUrl || '');
+    } catch (error) {
+      alert(error.message || 'Failed to upload profile photo.');
+    } finally {
+      setPhotoLoading(false);
+      event.target.value = '';
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    const profileIdentifier = user?.identifier || studentProfile.rollNumber;
+    if (!profileIdentifier) {
+      return;
+    }
+
+    try {
+      setPhotoLoading(true);
+      await deleteProfilePhoto(profileIdentifier);
+      setPhotoUrl('');
+    } catch (error) {
+      alert(error.message || 'Failed to remove profile photo.');
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
 
   const pendingRequest = profileUpdateRequests.find(
     (req) => req.userId === studentProfile.rollNumber && req.status === 'pending'
@@ -158,7 +236,31 @@ function StudentProfile() {
 
           <section className="profile-section">
             <div className="profile-head">
-              <div className="profile-avatar-large">{studentProfile.initials}</div>
+              <div className="profile-avatar-wrap">
+                {photoUrl ? (
+                  <img className="profile-avatar-image" src={toAbsolutePhotoUrl(photoUrl)} alt={`${studentProfile.name} profile`} />
+                ) : (
+                  <div className="profile-avatar-large">{studentProfile.initials}</div>
+                )}
+                <div className="profile-photo-actions">
+                  <label className="outline-btn upload-photo-btn" htmlFor="student-photo-upload">
+                    {photoLoading ? 'Uploading...' : 'Upload Photo'}
+                  </label>
+                  <input
+                    id="student-photo-upload"
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp"
+                    onChange={handlePhotoUpload}
+                    hidden
+                    disabled={photoLoading}
+                  />
+                  {photoUrl ? (
+                    <button type="button" className="outline-btn" onClick={handlePhotoDelete} disabled={photoLoading}>
+                      Remove Photo
+                    </button>
+                  ) : null}
+                </div>
+              </div>
               <div>
                 <h2>{studentProfile.name}</h2>
                 <p>{studentProfile.rollNumber}</p>
@@ -275,6 +377,17 @@ function StudentProfile() {
                   </div>
 
                   <div className="form-group">
+                    <label htmlFor="registrationNo">Registration Number</label>
+                    <input
+                      id="registrationNo"
+                      type="text"
+                      name="registrationNo"
+                      value={formData.registrationNo || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
                     <label htmlFor="email">Email Address *</label>
                     <input
                       id="email"
@@ -287,6 +400,61 @@ function StudentProfile() {
                   </div>
 
                   <div className="form-group">
+                    <label htmlFor="department">Department</label>
+                    <input
+                      id="department"
+                      type="text"
+                      name="department"
+                      value={formData.department || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="semester">Semester</label>
+                    <input
+                      id="semester"
+                      type="text"
+                      name="semester"
+                      value={formData.semester || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="section">Section</label>
+                    <input
+                      id="section"
+                      type="text"
+                      name="section"
+                      value={formData.section || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="batchYear">Batch Year</label>
+                    <input
+                      id="batchYear"
+                      type="text"
+                      name="batchYear"
+                      value={formData.batchYear || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="dateOfBirth">Date of Birth</label>
+                    <input
+                      id="dateOfBirth"
+                      type="date"
+                      name="dateOfBirth"
+                      value={formData.dateOfBirth || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
                     <label htmlFor="phoneNumber">Phone Number *</label>
                     <input
                       id="phoneNumber"
@@ -295,6 +463,50 @@ function StudentProfile() {
                       value={formData.phoneNumber || ''}
                       onChange={handleInputChange}
                       required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="guardianName">Guardian Name</label>
+                    <input
+                      id="guardianName"
+                      type="text"
+                      name="guardianName"
+                      value={formData.guardianName || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="guardianPhone">Guardian Phone</label>
+                    <input
+                      id="guardianPhone"
+                      type="tel"
+                      name="guardianPhone"
+                      value={formData.guardianPhone || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="address">Address</label>
+                    <textarea
+                      id="address"
+                      name="address"
+                      value={formData.address || ''}
+                      onChange={handleInputChange}
+                      rows="3"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="grade">Grade</label>
+                    <input
+                      id="grade"
+                      type="text"
+                      name="grade"
+                      value={formData.grade || ''}
+                      onChange={handleInputChange}
                     />
                   </div>
 

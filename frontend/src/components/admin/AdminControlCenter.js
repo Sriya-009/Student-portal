@@ -1,5 +1,10 @@
-import { useMemo, useState } from 'react';
-import { registerAdminCreatedUser } from '../../services/authService';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  assignStudentToFaculty,
+  getAllUsers,
+  getStudentFacultyAssignments,
+  registerAdminCreatedUser
+} from '../../services/authService';
 
 function AdminControlCenter({ students, mentors, projects, files, submissionEvents, activeSection, activeAction }) {
   const [users, setUsers] = useState(() => [
@@ -24,6 +29,10 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
   const [editUserId, setEditUserId] = useState(null);
   const [editUser, setEditUser] = useState({ name: '', email: '', department: '' });
   const [studentIdSearch, setStudentIdSearch] = useState('');
+  const [assignmentForm, setAssignmentForm] = useState({ studentIdentifier: '', facultyIdentifier: '' });
+  const [assignmentRows, setAssignmentRows] = useState([]);
+  const [directoryUsers, setDirectoryUsers] = useState([]);
+  const [assignmentError, setAssignmentError] = useState('');
 
   const [projectsState] = useState(projects);
 
@@ -49,6 +58,28 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
   const [featureText, setFeatureText] = useState('');
   const [maintenanceHistory, setMaintenanceHistory] = useState([]);
   const [archivedProjectIds, setArchivedProjectIds] = useState(new Set());
+
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.all([getAllUsers(), getStudentFacultyAssignments()])
+      .then(([allUsers, assignments]) => {
+        if (!isMounted) return;
+        setDirectoryUsers(allUsers || []);
+        setAssignmentRows(assignments || []);
+        setAssignmentError('');
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setDirectoryUsers([]);
+        setAssignmentRows([]);
+        setAssignmentError(error.message || 'Failed to load assignment data');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const addLog = (message) => {
     setActivityLogs((prev) => [
@@ -144,6 +175,16 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
     }
 
     setUsers((prev) => [createdUser, ...prev]);
+    setDirectoryUsers((prev) => [
+      {
+        identifier: createdUser.id,
+        name: createdUser.name,
+        email: createdUser.email,
+        role: createdUser.role,
+        department: createdUser.department
+      },
+      ...prev
+    ]);
     setDbRecordCount((prev) => prev + 1);
     addLog(`Registered user ${createdUser.id} (${createdUser.role})`);
 
@@ -222,6 +263,41 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
       ))
       .slice(0, 8);
   }, [users, studentIdSearch]);
+
+  const assignableStudents = useMemo(
+    () => directoryUsers.filter((entry) => String(entry.role || '').toLowerCase() === 'student'),
+    [directoryUsers]
+  );
+
+  const assignableFaculty = useMemo(
+    () => directoryUsers.filter((entry) => String(entry.role || '').toLowerCase() === 'faculty'),
+    [directoryUsers]
+  );
+
+  const handleAssignStudentToFaculty = async () => {
+    const studentIdentifier = String(assignmentForm.studentIdentifier || '').trim();
+    const facultyIdentifier = String(assignmentForm.facultyIdentifier || '').trim();
+
+    if (!studentIdentifier || !facultyIdentifier) {
+      alert('Please select both a student and a faculty member.');
+      return;
+    }
+
+    try {
+      const assignment = await assignStudentToFaculty(studentIdentifier, facultyIdentifier);
+      setAssignmentRows((prev) => {
+        const withoutStudent = prev.filter((row) => row.studentIdentifier !== assignment.studentIdentifier);
+        return [assignment, ...withoutStudent];
+      });
+      setAssignmentForm({ studentIdentifier: '', facultyIdentifier: '' });
+      setAssignmentError('');
+      addLog(`Assigned ${assignment.studentIdentifier} to faculty ${assignment.facultyIdentifier}`);
+      alert('Student assigned to faculty successfully.');
+    } catch (error) {
+      setAssignmentError(error.message || 'Failed to assign student to faculty');
+      alert(error.message || 'Failed to assign student to faculty');
+    }
+  };
 
   const dueSoonCount = useMemo(() => {
     const now = Date.now();
@@ -407,6 +483,55 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
                 </div>
               ))}
             </div>}
+
+            {(userAction === 'user-management-overview' || userAction === 'user-manage-roles') && (
+              <>
+                <h4>Assign Students to Faculty</h4>
+                <div className="admin-form-grid">
+                  <select
+                    className="form-select"
+                    value={assignmentForm.studentIdentifier}
+                    onChange={(e) => setAssignmentForm((prev) => ({ ...prev, studentIdentifier: e.target.value }))}
+                  >
+                    <option value="">Select Student</option>
+                    {assignableStudents.map((student) => (
+                      <option key={student.identifier || student.id} value={student.identifier}>
+                        {student.identifier} - {student.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    className="form-select"
+                    value={assignmentForm.facultyIdentifier}
+                    onChange={(e) => setAssignmentForm((prev) => ({ ...prev, facultyIdentifier: e.target.value }))}
+                  >
+                    <option value="">Select Faculty</option>
+                    {assignableFaculty.map((faculty) => (
+                      <option key={faculty.identifier || faculty.id} value={faculty.identifier}>
+                        {faculty.identifier} - {faculty.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button className="btn-primary" onClick={handleAssignStudentToFaculty}>Assign Student</button>
+                </div>
+
+                {assignmentError ? <p className="error">{assignmentError}</p> : null}
+
+                <div className="admin-log-list">
+                  {assignmentRows.length > 0 ? (
+                    assignmentRows.slice(0, 10).map((row) => (
+                      <p key={`${row.studentIdentifier}-${row.facultyIdentifier}`}>
+                        <strong>{row.studentIdentifier}</strong> ({row.studentName}) → <strong>{row.facultyIdentifier}</strong> ({row.facultyName})
+                      </p>
+                    ))
+                  ) : (
+                    <p className="muted-line">No student-faculty assignments yet.</p>
+                  )}
+                </div>
+              </>
+            )}
 
             {(userAction === 'user-update-details' || editUserId) ? (
               <div className="admin-form-grid">

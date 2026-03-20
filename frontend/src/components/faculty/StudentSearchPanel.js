@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-function StudentSearchPanel({ students, activeAction }) {
+function StudentSearchPanel({ students, activeAction, error = '' }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
 
@@ -33,10 +33,13 @@ function StudentSearchPanel({ students, activeAction }) {
     if (!normalized) return students;
 
     return students.filter((student) => {
+      const rollNumber = String(student.rollNumber || student.identifier || '').toLowerCase();
+      const studentId = String(student.id || '').toLowerCase();
+      const studentName = String(student.name || '').toLowerCase();
       return (
-        student.rollNumber.toLowerCase().includes(normalized) ||
-        student.id.toLowerCase().includes(normalized) ||
-        student.name.toLowerCase().includes(normalized)
+        rollNumber.includes(normalized) ||
+        studentId.includes(normalized) ||
+        studentName.includes(normalized)
       );
     });
   }, [students, searchQuery, selectedDepartment, actionMode]);
@@ -96,6 +99,7 @@ function StudentSearchPanel({ students, activeAction }) {
         </div>
 
         <div className="student-results-table">
+          {error ? <p className="error">{error}</p> : null}
           {filteredStudents.length === 0 ? (
             <p className="empty-state">No students found for the selected search criteria.</p>
           ) : (
@@ -111,12 +115,12 @@ function StudentSearchPanel({ students, activeAction }) {
               </thead>
               <tbody>
                 {filteredStudents.map((student) => (
-                  <tr key={student.id}>
-                    <td>{student.rollNumber}</td>
-                    <td>{student.name}</td>
+                  <tr key={student.id || student.rollNumber || student.identifier || student.email}>
+                    <td>{student.rollNumber || student.identifier || 'NA'}</td>
+                    <td>{student.name || 'NA'}</td>
                     <td>{student.department || 'Not Assigned'}</td>
-                    <td>{student.grade}</td>
-                    <td>{student.email}</td>
+                    <td>{student.grade || 'NA'}</td>
+                    <td>{student.email || 'NA'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -3,8 +3,26 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from '../components/shared/ThemeToggle';
 import { admins } from '../data/portalData';
-import { getUserProfile, updateUserProfile } from '../services/authService';
+import {
+  deleteProfilePhoto,
+  getProfilePhotoUrl,
+  getUserProfile,
+  updateUserProfile,
+  uploadProfilePhoto
+} from '../services/authService';
 import '../styles/profile.css';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+
+function toAbsolutePhotoUrl(photoUrl) {
+  if (!photoUrl) {
+    return '';
+  }
+  if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+    return photoUrl;
+  }
+  return `${API_BASE_URL}${photoUrl}`;
+}
 
 function AdminProfile() {
   const { user, logout } = useAuth();
@@ -14,6 +32,8 @@ function AdminProfile() {
   const [formData, setFormData] = useState({});
   const [error, setError] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [photoLoading, setPhotoLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -35,6 +55,33 @@ function AdminProfile() {
       .catch(() => {
         if (isMounted) {
           setBackendProfile(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const profileIdentifier = user?.identifier;
+
+    if (!profileIdentifier) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    getProfilePhotoUrl(profileIdentifier)
+      .then((nextPhotoUrl) => {
+        if (isMounted) {
+          setPhotoUrl(nextPhotoUrl || '');
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPhotoUrl('');
         }
       });
 
@@ -85,6 +132,13 @@ function AdminProfile() {
       return;
     }
 
+    const normalizedPermissions = Array.isArray(formData.permissions)
+      ? formData.permissions
+      : String(formData.permissions || '')
+        .split(',')
+        .map((permission) => permission.trim())
+        .filter(Boolean);
+
     try {
       const updated = await updateUserProfile(currentAdmin.identifier, {
         name: formData.name,
@@ -94,6 +148,7 @@ function AdminProfile() {
         employeeId: formData.employeeId,
         accessLevel: formData.accessLevel,
         emergencyContact: formData.emergencyContact,
+        permissions: normalizedPermissions,
         twoFactorEnabled: Boolean(formData.twoFactorEnabled),
         isActive: Boolean(formData.isActive)
       });
@@ -110,6 +165,41 @@ function AdminProfile() {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handlePhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !currentAdmin.identifier) {
+      return;
+    }
+
+    try {
+      setPhotoLoading(true);
+      const nextPhotoUrl = await uploadProfilePhoto(currentAdmin.identifier, file);
+      setPhotoUrl(nextPhotoUrl || '');
+    } catch (uploadError) {
+      setError(uploadError.message || 'Failed to upload profile photo.');
+    } finally {
+      setPhotoLoading(false);
+      event.target.value = '';
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    if (!currentAdmin.identifier) {
+      return;
+    }
+
+    try {
+      setPhotoLoading(true);
+      await deleteProfilePhoto(currentAdmin.identifier);
+      setPhotoUrl('');
+      setSaveMessage('Profile photo removed successfully.');
+    } catch (deleteError) {
+      setError(deleteError.message || 'Failed to remove profile photo.');
+    } finally {
+      setPhotoLoading(false);
+    }
   };
 
   return (
@@ -145,7 +235,31 @@ function AdminProfile() {
 
           <section className="profile-section">
             <div className="profile-head">
-              <div className="profile-avatar-large">{currentAdmin.initials}</div>
+              <div className="profile-avatar-wrap">
+                {photoUrl ? (
+                  <img className="profile-avatar-image" src={toAbsolutePhotoUrl(photoUrl)} alt={`${currentAdmin.name} profile`} />
+                ) : (
+                  <div className="profile-avatar-large">{currentAdmin.initials}</div>
+                )}
+                <div className="profile-photo-actions">
+                  <label className="outline-btn upload-photo-btn" htmlFor="admin-photo-upload">
+                    {photoLoading ? 'Uploading...' : 'Upload Photo'}
+                  </label>
+                  <input
+                    id="admin-photo-upload"
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp"
+                    onChange={handlePhotoUpload}
+                    hidden
+                    disabled={photoLoading}
+                  />
+                  {photoUrl ? (
+                    <button type="button" className="outline-btn" onClick={handlePhotoDelete} disabled={photoLoading}>
+                      Remove Photo
+                    </button>
+                  ) : null}
+                </div>
+              </div>
               <div>
                 <h2>{currentAdmin.name}</h2>
                 <p>{currentAdmin.identifier}</p>
@@ -259,6 +373,15 @@ function AdminProfile() {
                   <div className="form-group">
                     <label htmlFor="emergencyContact">Emergency Contact</label>
                     <input id="emergencyContact" name="emergencyContact" value={formData.emergencyContact || ''} onChange={handleInputChange} />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="permissions">Permissions (comma separated)</label>
+                    <input
+                      id="permissions"
+                      name="permissions"
+                      value={Array.isArray(formData.permissions) ? formData.permissions.join(', ') : (formData.permissions || '')}
+                      onChange={handleInputChange}
+                    />
                   </div>
                   <div className="form-actions">
                     <button type="button" className="outline-btn" onClick={handleToggleTwoFactor}>

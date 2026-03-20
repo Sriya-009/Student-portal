@@ -51,6 +51,7 @@ const USER_SELECT_FIELDS = [
   'two_factor_enabled',
   'is_active',
   'must_reset_password',
+  'assigned_faculty_identifier',
   'photo_url',
   'created_at',
   'updated_at'
@@ -136,7 +137,7 @@ const uploadMiddleware = multer({
 app.use(cors());
 app.use(express.json());
 app.use(apiRateLimiter);
-app.use('/uploads', express.static(uploadsDir));
+app.use('/uploads/profile-photos', express.static(uploadsDir));
 
 function maskPhone(phoneNumber) {
   const digits = (phoneNumber || '').replace(/\D/g, '');
@@ -306,9 +307,52 @@ function toSafeUser(user) {
     twoFactorEnabled: Boolean(user.two_factor_enabled),
     isActive: user.is_active === undefined ? true : Boolean(user.is_active),
     requiresPasswordReset: Boolean(user.must_reset_password),
+    assignedFacultyIdentifier: user.assigned_faculty_identifier || null,
+    photoUrl: user.photo_url || null,
     createdAt: user.created_at || null,
     updatedAt: user.updated_at || null
   };
+}
+
+function toSafeProject(project) {
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description || '',
+    department: project.department || '',
+    status: project.status || 'ongoing',
+    progressPercent: Number(project.progress_percent || 0),
+    deadline: project.deadline || 'NA',
+    ownerIdentifier: project.owner_identifier || null,
+    teamMembers: [],
+    technologies: []
+  };
+}
+
+async function ensureProjectsTable() {
+  const pool = getPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id VARCHAR(60) PRIMARY KEY,
+      name VARCHAR(180) NOT NULL,
+      description TEXT NULL,
+      department VARCHAR(120) NULL,
+      status VARCHAR(40) NOT NULL DEFAULT 'ongoing',
+      progress_percent INT NOT NULL DEFAULT 0,
+      deadline DATE NULL,
+      owner_identifier VARCHAR(50) NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+}
+
+async function ensureStudentFacultyAssignmentColumn() {
+  const pool = getPool();
+  const [rows] = await pool.query("SHOW COLUMNS FROM users LIKE 'assigned_faculty_identifier'");
+  if (rows.length === 0) {
+    await pool.query('ALTER TABLE users ADD COLUMN assigned_faculty_identifier VARCHAR(50) NULL');
+  }
 }
 
 async function ensureDefaultAdmin() {
@@ -404,6 +448,90 @@ app.get('/api/users', async (_req, res) => {
     res.json({ ok: true, users: rows.map(toSafeUser) });
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get('/api/projects', async (_req, res) => {
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query('SELECT * FROM projects ORDER BY updated_at DESC, created_at DESC LIMIT 200');
+
+    return res.json({
+      ok: true,
+      projects: rows.map(toSafeProject)
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post('/api/admin/assign-student-faculty', async (req, res) => {
+  const studentIdentifier = String(req.body?.studentIdentifier || '').trim();
+  const facultyIdentifier = String(req.body?.facultyIdentifier || '').trim();
+
+  if (!studentIdentifier || !facultyIdentifier) {
+    return res.status(400).json({ ok: false, error: 'studentIdentifier and facultyIdentifier are required' });
+  }
+
+  try {
+    const pool = getPool();
+    const student = await findUserByIdentifierOrEmail(pool, studentIdentifier);
+    const faculty = await findUserByIdentifierOrEmail(pool, facultyIdentifier);
+
+    if (!student || String(student.role || '').toLowerCase() !== 'student') {
+      return res.status(404).json({ ok: false, error: 'Student account not found' });
+    }
+
+    if (!faculty || String(faculty.role || '').toLowerCase() !== 'faculty') {
+      return res.status(404).json({ ok: false, error: 'Faculty account not found' });
+    }
+
+    await pool.query(
+      'UPDATE users SET assigned_faculty_identifier = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [faculty.identifier, student.id]
+    );
+
+    return res.json({
+      ok: true,
+      assignment: {
+        studentIdentifier: student.identifier,
+        studentName: student.name,
+        facultyIdentifier: faculty.identifier,
+        facultyName: faculty.name
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get('/api/admin/student-faculty-assignments', async (_req, res) => {
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query(`
+      SELECT
+        s.identifier AS student_identifier,
+        s.name AS student_name,
+        s.assigned_faculty_identifier AS faculty_identifier,
+        f.name AS faculty_name
+      FROM users s
+      LEFT JOIN users f ON s.assigned_faculty_identifier = f.identifier
+      WHERE s.role = 'student'
+      ORDER BY s.identifier ASC
+    `);
+
+    const assignments = rows
+      .filter((row) => row.faculty_identifier)
+      .map((row) => ({
+        studentIdentifier: row.student_identifier,
+        studentName: row.student_name,
+        facultyIdentifier: row.faculty_identifier,
+        facultyName: row.faculty_name || 'Unknown Faculty'
+      }));
+
+    return res.json({ ok: true, assignments });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
   }
 });
 
@@ -866,7 +994,8 @@ app.delete('/api/profile-photo/:identifier', async (req, res) => {
     );
 
     if (rows[0]?.photo_url) {
-      const filePath = path.join(__dirname, rows[0].photo_url);
+      const relativePhotoPath = String(rows[0].photo_url || '').replace(/^\//, '');
+      const filePath = path.join(__dirname, relativePhotoPath);
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
@@ -894,4 +1023,14 @@ app.listen(PORT, () => {
 ensureDefaultAdmin().catch((error) => {
   // eslint-disable-next-line no-console
   console.error(`Failed to ensure default admin: ${error.message}`);
+});
+
+ensureProjectsTable().catch((error) => {
+  // eslint-disable-next-line no-console
+  console.error(`Failed to ensure projects table: ${error.message}`);
+});
+
+ensureStudentFacultyAssignmentColumn().catch((error) => {
+  // eslint-disable-next-line no-console
+  console.error(`Failed to ensure student-faculty assignment column: ${error.message}`);
 });

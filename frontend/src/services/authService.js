@@ -152,7 +152,7 @@ export async function resetInitialPassword(identifier, newPassword) {
 export async function registerAdminCreatedUser({ identifier, name, email, department, role, phone }) {
   const normalizedRole = String(role || '').toLowerCase();
   const defaultPassword = normalizedRole === 'student'
-    ? 'stident123'
+    ? 'student123'
     : normalizedRole === 'faculty'
       ? 'faculty123'
       : 'admin009';
@@ -180,4 +180,63 @@ export async function registerAdminCreatedUser({ identifier, name, email, depart
     role: payload.user.role,
     password: defaultPassword
   };
+}
+
+export async function uploadProfilePhoto(identifier, file) {
+  const formData = new FormData();
+  formData.append('profilePhoto', file);
+
+  const response = await fetch(`${API_BASE_URL}/api/upload/profile-photo/${encodeURIComponent(identifier)}`, {
+    method: 'POST',
+    body: formData
+  });
+
+  const payload = await parseResponse(response);
+  return payload.photoUrl;
+}
+
+export async function getProfilePhotoUrl(identifier) {
+  const response = await fetch(`${API_BASE_URL}/api/profile-photo/${encodeURIComponent(identifier)}`);
+  const payload = await parseResponse(response);
+  return payload.photoUrl;
+}
+
+export async function deleteProfilePhoto(identifier) {
+  const response = await fetch(`${API_BASE_URL}/api/profile-photo/${encodeURIComponent(identifier)}`, {
+    method: 'DELETE'
+  });
+
+  const payload = await parseResponse(response);
+  return payload.message;
+}
+
+export async function getAllUsers() {
+  const response = await fetch(`${API_BASE_URL}/api/users`);
+  const payload = await parseResponse(response);
+  return payload.users || [];
+}
+
+export async function getAllProjects() {
+  const response = await fetch(`${API_BASE_URL}/api/projects`);
+  const payload = await parseResponse(response);
+  return payload.projects || [];
+}
+
+export async function assignStudentToFaculty(studentIdentifier, facultyIdentifier) {
+  const response = await fetch(`${API_BASE_URL}/api/admin/assign-student-faculty`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ studentIdentifier, facultyIdentifier })
+  });
+
+  const payload = await parseResponse(response);
+  return payload.assignment;
+}
+
+export async function getStudentFacultyAssignments() {
+  const response = await fetch(`${API_BASE_URL}/api/admin/student-faculty-assignments`);
+  const payload = await parseResponse(response);
+  return payload.assignments || [];
 }

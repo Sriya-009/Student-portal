@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from '../components/shared/ThemeToggle';
@@ -13,14 +13,83 @@ import GradingPanel from '../components/faculty/GradingPanel';
 import ReportsAnalyticsPanel from '../components/faculty/ReportsAnalyticsPanel';
 import FinalActionsPanel from '../components/faculty/FinalActionsPanel';
 import StudentSearchPanel from '../components/faculty/StudentSearchPanel';
-import { mentors, students, projectProposals, bTechProjects, projectGrades, projectTasks, projectFiles } from '../data/portalData';
+import { mentors, projectProposals, projectGrades, projectTasks, projectFiles } from '../data/portalData';
+import { getAllProjects, getAllUsers } from '../services/authService';
 import '../styles/dashboard.css';
 
 function FacultyDashboard() {
   const [activeView, setActiveView] = useState('approval');
   const [activeAction, setActiveAction] = useState('approval-review');
+  const [registeredStudents, setRegisteredStudents] = useState([]);
+  const [registeredProjects, setRegisteredProjects] = useState([]);
+  const [studentSearchError, setStudentSearchError] = useState('');
+  const [projectLoadError, setProjectLoadError] = useState('');
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+    const facultyIdentifier = String(user?.identifier || user?.facultyId || '').trim().toLowerCase();
+
+    getAllUsers()
+      .then((users) => {
+        if (!isMounted) return;
+
+        const onlyStudents = users
+          .filter((entry) => {
+            if (String(entry.role || '').toLowerCase() !== 'student') {
+              return false;
+            }
+
+            if (!facultyIdentifier) {
+              return true;
+            }
+
+            return String(entry.assignedFacultyIdentifier || '').trim().toLowerCase() === facultyIdentifier;
+          })
+          .map((entry) => ({
+            id: entry.id || entry.identifier,
+            rollNumber: entry.identifier || '',
+            name: entry.name || '',
+            email: entry.email || '',
+            department: entry.department || '',
+            grade: entry.grade || 'NA',
+            registrationNo: entry.registrationNo || ''
+          }));
+
+        setRegisteredStudents(onlyStudents);
+        setStudentSearchError('');
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setRegisteredStudents([]);
+        setStudentSearchError(error.message || 'Failed to load registered students');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getAllProjects()
+      .then((projects) => {
+        if (!isMounted) return;
+        setRegisteredProjects(projects || []);
+        setProjectLoadError('');
+      })
+      .catch((error) => {
+        if (!isMounted) return;
+        setRegisteredProjects([]);
+        setProjectLoadError(error.message || 'Failed to load registered projects');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const currentFaculty = useMemo(() => {
     const profileIdentifier = user?.identifier || user?.facultyId;
@@ -45,31 +114,31 @@ function FacultyDashboard() {
           <ProjectApprovalPanel
             proposals={projectProposals}
             mentors={mentors}
-            projects={bTechProjects}
-            students={students}
+            projects={registeredProjects}
+            students={registeredStudents}
             activeAction={activeAction}
           />
         );
       case 'monitoring':
-        return <ProjectMonitoringPanel projects={bTechProjects} tasks={projectTasks} activeAction={activeAction} />;
+        return <ProjectMonitoringPanel projects={registeredProjects} tasks={projectTasks} activeAction={activeAction} />;
       case 'tasks':
         return <TaskOversightPanel tasks={projectTasks} studentsMap={getStudentMap()} activeAction={activeAction} />;
       case 'files':
-        return <FileReviewPanel files={projectFiles} projects={bTechProjects} activeAction={activeAction} />;
+        return <FileReviewPanel files={projectFiles} projects={registeredProjects} activeAction={activeAction} />;
       case 'student-search':
-        return <StudentSearchPanel students={students} activeAction={activeAction} />;
+        return <StudentSearchPanel students={registeredStudents} activeAction={activeAction} error={studentSearchError} />;
       case 'communication':
         return <CommunicationPanel facultyId={currentFaculty.id} activeAction={activeAction} />;
       case 'feedback':
         return <FeedbackEvaluationPanel grades={projectGrades} facultyId={currentFaculty.id} activeAction={activeAction} />;
       case 'grading':
-        return <GradingPanel grades={projectGrades} projects={bTechProjects} />;
+        return <GradingPanel grades={projectGrades} projects={registeredProjects} />;
       case 'reports':
-        return <ReportsAnalyticsPanel projects={bTechProjects} grades={projectGrades} activeAction={activeAction} />;
+        return <ReportsAnalyticsPanel projects={registeredProjects} grades={projectGrades} activeAction={activeAction} />;
       case 'final-actions':
-        return <FinalActionsPanel projects={bTechProjects} activeAction={activeAction} />;
+        return <FinalActionsPanel projects={registeredProjects} activeAction={activeAction} />;
       default:
-        return <ProjectApprovalPanel proposals={projectProposals} mentors={mentors} projects={bTechProjects} students={students} />;
+        return <ProjectApprovalPanel proposals={projectProposals} mentors={mentors} projects={registeredProjects} students={registeredStudents} />;
     }
   };
 
@@ -139,6 +208,7 @@ function FacultyDashboard() {
           <section className="page-head">
             <h1>{getPageTitle(activeView)}</h1>
             <p>{getPageDescription(activeView)}</p>
+            {projectLoadError ? <p className="error">{projectLoadError}</p> : null}
           </section>
 
           {renderActiveView()}

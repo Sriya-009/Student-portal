@@ -2,9 +2,21 @@ import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { mentors, profileUpdateRequests } from '../data/portalData';
-import { getUserProfile } from '../services/authService';
+import { deleteProfilePhoto, getProfilePhotoUrl, getUserProfile, uploadProfilePhoto } from '../services/authService';
 import ThemeToggle from '../components/shared/ThemeToggle';
 import '../styles/profile.css';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+
+function toAbsolutePhotoUrl(photoUrl) {
+  if (!photoUrl) {
+    return '';
+  }
+  if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+    return photoUrl;
+  }
+  return `${API_BASE_URL}${photoUrl}`;
+}
 
 function FacultyProfile() {
   const { user, logout } = useAuth();
@@ -14,6 +26,8 @@ function FacultyProfile() {
   const [updateReason, setUpdateReason] = useState('');
   const [submitMessage, setSubmitMessage] = useState('');
   const [backendProfile, setBackendProfile] = useState(null);
+  const [photoUrl, setPhotoUrl] = useState('');
+  const [photoLoading, setPhotoLoading] = useState(false);
 
   const currentFaculty = useMemo(() => {
     const profileIdentifier = user?.identifier || user?.facultyId;
@@ -66,6 +80,70 @@ function FacultyProfile() {
       isMounted = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const profileIdentifier = user?.identifier || user?.facultyId;
+
+    if (!profileIdentifier) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    getProfilePhotoUrl(profileIdentifier)
+      .then((nextPhotoUrl) => {
+        if (isMounted) {
+          setPhotoUrl(nextPhotoUrl || '');
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setPhotoUrl('');
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  const handlePhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    const profileIdentifier = user?.identifier || facultyProfile.id;
+
+    if (!file || !profileIdentifier) {
+      return;
+    }
+
+    try {
+      setPhotoLoading(true);
+      const nextPhotoUrl = await uploadProfilePhoto(profileIdentifier, file);
+      setPhotoUrl(nextPhotoUrl || '');
+    } catch (error) {
+      alert(error.message || 'Failed to upload profile photo.');
+    } finally {
+      setPhotoLoading(false);
+      event.target.value = '';
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    const profileIdentifier = user?.identifier || facultyProfile.id;
+    if (!profileIdentifier) {
+      return;
+    }
+
+    try {
+      setPhotoLoading(true);
+      await deleteProfilePhoto(profileIdentifier);
+      setPhotoUrl('');
+    } catch (error) {
+      alert(error.message || 'Failed to remove profile photo.');
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
 
   const pendingRequest = profileUpdateRequests.find(
     (req) => req.userId === facultyProfile.id && req.status === 'pending'
@@ -165,7 +243,31 @@ function FacultyProfile() {
 
           <section className="profile-section">
             <div className="profile-head">
-              <div className="profile-avatar-large">{facultyProfile.initials}</div>
+              <div className="profile-avatar-wrap">
+                {photoUrl ? (
+                  <img className="profile-avatar-image" src={toAbsolutePhotoUrl(photoUrl)} alt={`${facultyProfile.name} profile`} />
+                ) : (
+                  <div className="profile-avatar-large">{facultyProfile.initials}</div>
+                )}
+                <div className="profile-photo-actions">
+                  <label className="outline-btn upload-photo-btn" htmlFor="faculty-photo-upload">
+                    {photoLoading ? 'Uploading...' : 'Upload Photo'}
+                  </label>
+                  <input
+                    id="faculty-photo-upload"
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp"
+                    onChange={handlePhotoUpload}
+                    hidden
+                    disabled={photoLoading}
+                  />
+                  {photoUrl ? (
+                    <button type="button" className="outline-btn" onClick={handlePhotoDelete} disabled={photoLoading}>
+                      Remove Photo
+                    </button>
+                  ) : null}
+                </div>
+              </div>
               <div>
                 <h2>{facultyProfile.name}</h2>
                 <p>{facultyProfile.id}</p>
@@ -282,6 +384,17 @@ function FacultyProfile() {
                   </div>
 
                   <div className="form-group">
+                    <label htmlFor="employeeId">Employee ID</label>
+                    <input
+                      id="employeeId"
+                      type="text"
+                      name="employeeId"
+                      value={formData.employeeId || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
                     <label htmlFor="email">Email Address *</label>
                     <input
                       id="email"
@@ -290,6 +403,17 @@ function FacultyProfile() {
                       value={formData.email || ''}
                       onChange={handleInputChange}
                       required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="department">Department</label>
+                    <input
+                      id="department"
+                      type="text"
+                      name="department"
+                      value={formData.department || ''}
+                      onChange={handleInputChange}
                     />
                   </div>
 
@@ -313,6 +437,72 @@ function FacultyProfile() {
                       name="specialization"
                       value={formData.specialization || ''}
                       onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="designation">Designation</label>
+                    <input
+                      id="designation"
+                      type="text"
+                      name="designation"
+                      value={formData.designation || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="qualification">Qualification</label>
+                    <input
+                      id="qualification"
+                      type="text"
+                      name="qualification"
+                      value={formData.qualification || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="officeLocation">Office Location</label>
+                    <input
+                      id="officeLocation"
+                      type="text"
+                      name="officeLocation"
+                      value={formData.officeLocation || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="officeHours">Office Hours</label>
+                    <input
+                      id="officeHours"
+                      type="text"
+                      name="officeHours"
+                      value={formData.officeHours || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="joiningDate">Joining Date</label>
+                    <input
+                      id="joiningDate"
+                      type="date"
+                      name="joiningDate"
+                      value={formData.joiningDate || ''}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="bio">Bio</label>
+                    <textarea
+                      id="bio"
+                      name="bio"
+                      value={formData.bio || ''}
+                      onChange={handleInputChange}
+                      rows="3"
                     />
                   </div>
 
