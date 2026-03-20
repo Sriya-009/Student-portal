@@ -16,9 +16,15 @@ function StudentDashboard() {
   const navigate = useNavigate();
 
   const currentStudent = useMemo(() => {
-    if (user?.rollNumber) {
-      const byRoll = students.find((student) => student.rollNumber === user.rollNumber);
-      if (byRoll) return byRoll;
+    if (user) {
+      return {
+        name: user.name,
+        identifier: user.identifier,
+        initials: user.name.charAt(0).toUpperCase(),
+        email: user.email,
+        rollNumber: user.identifier,
+        department: user.department || 'Computer Science'
+      };
     }
     return students[0];
   }, [user]);
@@ -44,7 +50,7 @@ function StudentDashboard() {
           <span className="topbar-avatar">{currentStudent.initials}</span>
           <div>
             <p className="topbar-name">{currentStudent.name}</p>
-            <p className="topbar-meta">{currentStudent.grade} • {currentStudent.rollNumber}</p>
+            <p className="topbar-meta">Student ID: {currentStudent.rollNumber}</p>
           </div>
         </div>
         <div className="topbar-actions">

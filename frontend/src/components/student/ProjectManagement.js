@@ -22,10 +22,6 @@ function ProjectManagement({ studentId, workspaceAction }) {
   const [projectMessages, setProjectMessages] = useState(projectChats);
   const [newMessage, setNewMessage] = useState('');
   const [workspaceNotice, setWorkspaceNotice] = useState('');
-  const [showAddTeamMember, setShowAddTeamMember] = useState(false);
-  const [newTeamMemberName, setNewTeamMemberName] = useState('');
-  const [newTeamMemberStudentId, setNewTeamMemberStudentId] = useState('');
-  const [newTeamMemberEmail, setNewTeamMemberEmail] = useState('');
   const [showEditSuggestion, setShowEditSuggestion] = useState(false);
   const [editSuggestion, setEditSuggestion] = useState({
     taskId: '',
@@ -142,52 +138,7 @@ function ProjectManagement({ studentId, workspaceAction }) {
     setNewMessage('');
   };
 
-  const handleAddTeamMember = (e) => {
-    e.preventDefault();
-    if (!newTeamMemberName.trim() || !newTeamMemberStudentId.trim() || !newTeamMemberEmail.trim() || !selectedProject) {
-      alert('Please enter team member name, student ID, and email');
-      return;
-    }
 
-    const selected = projects.find((p) => p.id === selectedProject);
-    const normalizedStudentId = newTeamMemberStudentId.trim().toUpperCase();
-    const normalizedEmail = newTeamMemberEmail.trim().toLowerCase();
-
-    const alreadyExists = selected?.teamMembers?.some(
-      (member) => member.id.toLowerCase() === normalizedStudentId.toLowerCase() || (member.email || '').toLowerCase() === normalizedEmail
-    );
-    if (alreadyExists) {
-      alert('Team member with this student ID or email already exists in this project.');
-      return;
-    }
-
-    const updatedProjects = projects.map((p) => {
-      if (p.id === selectedProject) {
-        const newMemberId = normalizedStudentId;
-        return {
-          ...p,
-          teamMemberIds: [...p.teamMemberIds, newMemberId],
-          teamMembers: [
-            ...p.teamMembers,
-            {
-              id: newMemberId,
-              name: newTeamMemberName,
-              role: 'Contributor',
-              email: newTeamMemberEmail.trim()
-            }
-          ]
-        };
-      }
-      return p;
-    });
-
-    setProjects(updatedProjects);
-    setNewTeamMemberName('');
-    setNewTeamMemberStudentId('');
-    setNewTeamMemberEmail('');
-    setShowAddTeamMember(false);
-    alert(`✓ ${newTeamMemberName} added to the project!`);
-  };
 
   const handleRemoveTeamMember = (memberId) => {
     if (!selectedProject) return;
@@ -325,15 +276,6 @@ function ProjectManagement({ studentId, workspaceAction }) {
       case 'filter-completed':
         setProjectFilter('completed');
         setWorkspaceNotice('Filtered to completed projects.');
-        break;
-      case 'team-add-join':
-        openProjectView(firstProject, 'overview');
-        if (firstProject && firstProject.ownerId === studentId) {
-          setShowAddTeamMember(true);
-          setWorkspaceNotice('Add team members to your project.');
-        } else {
-          setWorkspaceNotice('Only project owners can add team members.');
-        }
         break;
       case 'team-communicate':
         openProjectView(firstProject, 'chat');
@@ -575,16 +517,7 @@ function ProjectManagement({ studentId, workspaceAction }) {
                         </div>
                       ))}
                     </div>
-                    {selectedProjectData.ownerId === studentId && (
-                      <button
-                        type="button"
-                        className="primary-dark-btn"
-                        onClick={() => setShowAddTeamMember(true)}
-                        style={{ marginTop: '12px' }}
-                      >
-                        + Add Team Member
-                      </button>
-                    )}
+
                   </div>
                 </>
               )}
@@ -1107,65 +1040,7 @@ function ProjectManagement({ studentId, workspaceAction }) {
         </div>
       ) : null}
 
-      {showAddTeamMember ? (
-        <div className="modal-overlay">
-          <form className="modal-card" onSubmit={handleAddTeamMember}>
-            <div className="modal-head">
-              <div>
-                <h3>Add Team Member</h3>
-                <p>Add a new member to your project</p>
-              </div>
-              <button type="button" className="icon-btn" onClick={() => setShowAddTeamMember(false)}>✕</button>
-            </div>
 
-            <label htmlFor="memberName">Team Member Name</label>
-            <input
-              id="memberName"
-              type="text"
-              placeholder="Enter member name"
-              value={newTeamMemberName}
-              onChange={(e) => setNewTeamMemberName(e.target.value)}
-              required
-            />
-
-            <label htmlFor="memberStudentId">Student ID</label>
-            <input
-              id="memberStudentId"
-              type="text"
-              placeholder="Enter student ID (e.g., STU005)"
-              value={newTeamMemberStudentId}
-              onChange={(e) => setNewTeamMemberStudentId(e.target.value)}
-              required
-            />
-
-            <label htmlFor="memberEmail">Student Email</label>
-            <input
-              id="memberEmail"
-              type="email"
-              placeholder="Enter student email"
-              value={newTeamMemberEmail}
-              onChange={(e) => setNewTeamMemberEmail(e.target.value)}
-              required
-            />
-
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="outline-btn"
-                onClick={() => {
-                  setShowAddTeamMember(false);
-                  setNewTeamMemberName('');
-                  setNewTeamMemberStudentId('');
-                  setNewTeamMemberEmail('');
-                }}
-              >
-                Cancel
-              </button>
-              <button type="submit" className="primary-dark-btn">Add Member</button>
-            </div>
-          </form>
-        </div>
-      ) : null}
 
       {showEditSuggestion && selectedProjectData ? (
         <div className="modal-overlay">
