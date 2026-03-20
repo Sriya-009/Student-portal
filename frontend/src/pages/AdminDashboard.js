@@ -27,7 +27,12 @@ function AdminDashboard() {
             <p className="topbar-meta">Centralized control for users, operations, and records</p>
           </div>
         </div>
-        <button type="button" className="outline-btn" onClick={handleLogout}>Logout</button>
+        <div className="topbar-actions">
+          <button type="button" className="outline-btn" onClick={() => navigate('/admin/profile')}>
+            My Profile
+          </button>
+          <button type="button" className="outline-btn" onClick={handleLogout}>Logout</button>
+        </div>
       </header>
 
       <div className="portal-layout">

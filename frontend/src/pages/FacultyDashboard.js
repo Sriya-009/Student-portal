@@ -23,8 +23,11 @@ function FacultyDashboard() {
   const navigate = useNavigate();
 
   const currentFaculty = useMemo(() => {
-    if (user?.facultyId) {
-      const byId = mentors.find((mentor) => mentor.id === user.facultyId);
+    const profileIdentifier = user?.identifier || user?.facultyId;
+    if (profileIdentifier) {
+      const byId = mentors.find(
+        (mentor) => mentor.id === profileIdentifier || mentor.identifier === profileIdentifier
+      );
       if (byId) return byId;
     }
     return mentors[0];
@@ -90,6 +93,9 @@ function FacultyDashboard() {
         </div>
         <div className="topbar-actions">
           <ThemeToggle />
+          <button type="button" className="outline-btn" onClick={() => navigate('/faculty/profile')}>
+            My Profile
+          </button>
           <button type="button" className="outline-btn" onClick={handleLogout}>Logout</button>
         </div>
       </header>

@@ -111,6 +111,14 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
       }
     }
 
+    // For admin, validate a basic admin ID format.
+    if (newUser.role === 'admin') {
+      if (!newUser.id.match(/^ADM[0-9]{3,}$/i)) {
+        alert('Admin ID must start with ADM followed by at least 3 digits (example: ADM001).');
+        return;
+      }
+    }
+
     const createdUser = {
       id: newUser.id.trim().toUpperCase(),
       name: newUser.name.trim(),
@@ -360,6 +368,7 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
               <select className="form-select" value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}>
                 <option value="student">Student</option>
                 <option value="faculty">Faculty</option>
+                <option value="admin">Admin</option>
               </select>
               <button className="btn-primary" onClick={handleAddUser}>Register User</button>
             </div>}
@@ -390,6 +399,7 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
                     <select className="form-select compact" value={user.role} onChange={(e) => handleRoleChange(user.id, e.target.value)}>
                       <option value="student">Student</option>
                       <option value="faculty">Faculty</option>
+                      <option value="admin">Admin</option>
                     </select>
                     <button className="btn-secondary" onClick={() => startEditUser(user)}>Edit</button>
                     <button className="btn-danger" onClick={() => removeUser(user.id)}>Remove</button>

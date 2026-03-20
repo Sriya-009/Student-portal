@@ -11,8 +11,71 @@ const PORT = Number(process.env.SERVER_PORT || 5000);
 const JWT_SECRET = process.env.JWT_SECRET || process.env.REACT_APP_JWT_SECRET || 'portal-dev-secret-key';
 const JWT_EXPIRES_IN = '1h';
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
+const DEFAULT_ADMIN_IDENTIFIER = process.env.DEFAULT_ADMIN_IDENTIFIER || 'admin1';
+const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || 'admin009';
 const otpSessions = new Map();
 const lastIssuedOtpByUser = new Map();
+const USER_SELECT_FIELDS = [
+  'id',
+  'identifier',
+  'name',
+  'email',
+  'password',
+  'role',
+  'department',
+  'phone',
+  'registration_no',
+  'semester',
+  'section',
+  'batch_year',
+  'date_of_birth',
+  'guardian_name',
+  'guardian_phone',
+  'address',
+  'employee_id',
+  'designation',
+  'specialization',
+  'qualification',
+  'office_location',
+  'office_hours',
+  'joining_date',
+  'bio',
+  'access_level',
+  'permissions_json',
+  'emergency_contact',
+  'two_factor_enabled',
+  'is_active',
+  'must_reset_password',
+  'created_at',
+  'updated_at'
+].join(', ');
+const PROFILE_FIELD_MAP = {
+  name: 'name',
+  email: 'email',
+  department: 'department',
+  phoneNumber: 'phone',
+  registrationNo: 'registration_no',
+  semester: 'semester',
+  section: 'section',
+  batchYear: 'batch_year',
+  dateOfBirth: 'date_of_birth',
+  guardianName: 'guardian_name',
+  guardianPhone: 'guardian_phone',
+  address: 'address',
+  employeeId: 'employee_id',
+  designation: 'designation',
+  specialization: 'specialization',
+  qualification: 'qualification',
+  officeLocation: 'office_location',
+  officeHours: 'office_hours',
+  joiningDate: 'joining_date',
+  bio: 'bio',
+  accessLevel: 'access_level',
+  permissions: 'permissions_json',
+  emergencyContact: 'emergency_contact',
+  twoFactorEnabled: 'two_factor_enabled',
+  isActive: 'is_active'
+};
 
 app.use(cors());
 app.use(express.json());
@@ -78,13 +141,47 @@ async function verifyPasswordAndMigrate(pool, user, plainPassword) {
 async function findUserByIdentifierOrEmail(pool, identifier) {
   const normalized = String(identifier || '').trim().toLowerCase();
   const [rows] = await pool.query(
-    `SELECT id, identifier, name, email, password, role, department, phone, created_at
+    `SELECT ${USER_SELECT_FIELDS}
      FROM users
      WHERE LOWER(identifier) = ? OR LOWER(email) = ?
      LIMIT 1`,
     [normalized, normalized]
   );
   return rows[0] || null;
+}
+
+function parseJsonArray(value) {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function toDbPatchValue(inputKey, value) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (inputKey === 'permissions') {
+    return JSON.stringify(Array.isArray(value) ? value : []);
+  }
+
+  if (inputKey === 'twoFactorEnabled' || inputKey === 'isActive') {
+    return value ? 1 : 0;
+  }
+
+  const normalized = String(value || '').trim();
+  return normalized || null;
 }
 
 function toSafeUser(user) {
@@ -95,9 +192,68 @@ function toSafeUser(user) {
     email: user.email,
     role: user.role,
     department: user.department || null,
-    phone: user.phone || null,
-    createdAt: user.created_at || null
+    phoneNumber: user.phone || null,
+    registrationNo: user.registration_no || null,
+    semester: user.semester || null,
+    section: user.section || null,
+    batchYear: user.batch_year || null,
+    dateOfBirth: user.date_of_birth || null,
+    guardianName: user.guardian_name || null,
+    guardianPhone: user.guardian_phone || null,
+    address: user.address || null,
+    employeeId: user.employee_id || null,
+    designation: user.designation || null,
+    specialization: user.specialization || null,
+    qualification: user.qualification || null,
+    officeLocation: user.office_location || null,
+    officeHours: user.office_hours || null,
+    joiningDate: user.joining_date || null,
+    bio: user.bio || null,
+    accessLevel: user.access_level || null,
+    permissions: parseJsonArray(user.permissions_json),
+    emergencyContact: user.emergency_contact || null,
+    twoFactorEnabled: Boolean(user.two_factor_enabled),
+    isActive: user.is_active === undefined ? true : Boolean(user.is_active),
+    requiresPasswordReset: Boolean(user.must_reset_password),
+    createdAt: user.created_at || null,
+    updatedAt: user.updated_at || null
   };
+}
+
+async function ensureDefaultAdmin() {
+  const pool = getPool();
+  const normalizedIdentifier = String(DEFAULT_ADMIN_IDENTIFIER).trim().toLowerCase();
+
+  if (!normalizedIdentifier) {
+    return;
+  }
+
+  const [existingRows] = await pool.query(
+    'SELECT id FROM users WHERE LOWER(identifier) = ? LIMIT 1',
+    [normalizedIdentifier]
+  );
+
+  if (existingRows.length > 0) {
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(String(DEFAULT_ADMIN_PASSWORD), BCRYPT_SALT_ROUNDS);
+  await pool.query(
+    `INSERT INTO users
+     (identifier, name, email, role, department, access_level, is_active, must_reset_password, password)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      String(DEFAULT_ADMIN_IDENTIFIER).trim(),
+      'System Default Admin',
+      `${String(DEFAULT_ADMIN_IDENTIFIER).trim().toLowerCase()}@portal.local`,
+      'admin',
+      'Administration',
+      'Super Admin',
+      1,
+      0,
+      passwordHash
+    ]
+  );
 }
 
 async function generateIdentifierForRole(pool, role) {
@@ -151,12 +307,78 @@ app.get('/api/users', async (_req, res) => {
   try {
     const pool = getPool();
     const [rows] = await pool.query(
-      'SELECT id, identifier, name, email, role, department, phone, created_at FROM users ORDER BY id DESC LIMIT 100'
+      `SELECT ${USER_SELECT_FIELDS} FROM users ORDER BY id DESC LIMIT 100`
     );
 
-    res.json({ ok: true, users: rows });
+    res.json({ ok: true, users: rows.map(toSafeUser) });
   } catch (error) {
     res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get('/api/profile/:identifier', async (req, res) => {
+  const normalizedIdentifier = String(req.params.identifier || '').trim();
+  if (!normalizedIdentifier) {
+    return res.status(400).json({ ok: false, error: 'identifier is required' });
+  }
+
+  try {
+    const pool = getPool();
+    const user = await findUserByIdentifierOrEmail(pool, normalizedIdentifier);
+    if (!user) {
+      return res.status(404).json({ ok: false, error: 'User profile not found' });
+    }
+
+    return res.json({ ok: true, user: toSafeUser(user) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.patch('/api/profile/:identifier', async (req, res) => {
+  const normalizedIdentifier = String(req.params.identifier || '').trim();
+  if (!normalizedIdentifier) {
+    return res.status(400).json({ ok: false, error: 'identifier is required' });
+  }
+
+  const updates = [];
+  const params = [];
+
+  Object.keys(req.body || {}).forEach((inputKey) => {
+    const dbField = PROFILE_FIELD_MAP[inputKey];
+    if (!dbField) {
+      return;
+    }
+
+    const dbValue = toDbPatchValue(inputKey, req.body[inputKey]);
+    if (dbValue === undefined) {
+      return;
+    }
+
+    updates.push(`${dbField} = ?`);
+    params.push(dbValue);
+  });
+
+  if (updates.length === 0) {
+    return res.status(400).json({ ok: false, error: 'No valid profile fields provided' });
+  }
+
+  try {
+    const pool = getPool();
+    params.push(normalizedIdentifier);
+    await pool.query(
+      `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE LOWER(identifier) = LOWER(?)`,
+      params
+    );
+
+    const updatedUser = await findUserByIdentifierOrEmail(pool, normalizedIdentifier);
+    if (!updatedUser) {
+      return res.status(404).json({ ok: false, error: 'User profile not found after update' });
+    }
+
+    return res.json({ ok: true, user: toSafeUser(updatedUser) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
   }
 });
 
@@ -316,6 +538,40 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
+app.post('/api/auth/reset-initial-password', async (req, res) => {
+  const { identifier, newPassword } = req.body;
+  const normalizedIdentifier = String(identifier || '').trim();
+
+  if (!normalizedIdentifier || !newPassword) {
+    return res.status(400).json({ ok: false, error: 'identifier and newPassword are required' });
+  }
+
+  if (String(newPassword).trim().length < 6) {
+    return res.status(400).json({ ok: false, error: 'New password must be at least 6 characters.' });
+  }
+
+  try {
+    const pool = getPool();
+    const user = await findUserByIdentifierOrEmail(pool, normalizedIdentifier);
+    if (!user) {
+      return res.status(404).json({ ok: false, error: 'User not found' });
+    }
+
+    const passwordHash = await bcrypt.hash(String(newPassword), BCRYPT_SALT_ROUNDS);
+    await pool.query(
+      `UPDATE users
+       SET password = ?, must_reset_password = 0, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [passwordHash, user.id]
+    );
+
+    const updatedUser = await findUserByIdentifierOrEmail(pool, normalizedIdentifier);
+    return res.json({ ok: true, user: toSafeUser(updatedUser) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 app.post('/api/auth/signup', async (req, res) => {
   const { name, email, password, role = 'student', department, phone } = req.body;
 
@@ -334,8 +590,8 @@ app.post('/api/auth/signup', async (req, res) => {
     const passwordHash = await bcrypt.hash(String(password), BCRYPT_SALT_ROUNDS);
 
     await pool.query(
-      `INSERT INTO users (identifier, name, email, role, department, phone, password)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (identifier, name, email, role, department, phone, must_reset_password, password)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
       [
         identifier,
         String(name).trim(),
@@ -343,6 +599,7 @@ app.post('/api/auth/signup', async (req, res) => {
         normalizedRole,
         String(department || '').trim() || null,
         String(phone || '').trim() || null,
+        0,
         passwordHash
       ]
     );
@@ -392,8 +649,8 @@ app.post('/api/users', async (req, res) => {
     const pool = getPool();
     const passwordHash = await bcrypt.hash(String(password), BCRYPT_SALT_ROUNDS);
     await pool.query(
-      `INSERT INTO users (identifier, name, email, role, department, phone, password)
-       VALUES (?, ?, ?, ?, ?, ?, ?)` ,
+      `INSERT INTO users (identifier, name, email, role, department, phone, must_reset_password, password)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
       [
         String(identifier).trim().toUpperCase(),
         String(name).trim(),
@@ -401,6 +658,7 @@ app.post('/api/users', async (req, res) => {
         String(role).trim().toLowerCase(),
         String(department || '').trim() || null,
         String(phone || '').trim() || null,
+        1,
         passwordHash
       ]
     );
@@ -414,7 +672,7 @@ app.post('/api/users', async (req, res) => {
         email: String(email).trim().toLowerCase(),
         role: String(role).trim().toLowerCase(),
         department: String(department || '').trim() || null,
-        phone: String(phone || '').trim() || null
+        phoneNumber: String(phone || '').trim() || null
       }
     });
   } catch (error) {
@@ -428,4 +686,9 @@ app.post('/api/users', async (req, res) => {
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`API server running on http://localhost:${PORT}`);
+});
+
+ensureDefaultAdmin().catch((error) => {
+  // eslint-disable-next-line no-console
+  console.error(`Failed to ensure default admin: ${error.message}`);
 });

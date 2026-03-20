@@ -1,5 +1,12 @@
 import { createContext, useContext, useMemo, useState } from 'react';
-import { loginUser, signupUser, verifyStaffOtp, resendOtp, requestPasswordReset } from '../services/authService';
+import {
+  loginUser,
+  signupUser,
+  verifyStaffOtp,
+  resendOtp,
+  requestPasswordReset,
+  resetInitialPassword
+} from '../services/authService';
 
 const AuthContext = createContext(null);
 
@@ -39,6 +46,12 @@ export function AuthProvider({ children }) {
     return requestPasswordReset(identifier);
   };
 
+  const resetFirstLoginPassword = async (identifier, newPassword) => {
+    const updatedUser = await resetInitialPassword(identifier, newPassword);
+    setUser((prev) => ({ ...(prev || {}), ...updatedUser }));
+    return updatedUser;
+  };
+
   const value = useMemo(
     () => ({
       user,
@@ -46,6 +59,7 @@ export function AuthProvider({ children }) {
       verifyOtp,
       resendOtp: resend,
       forgotPassword,
+      resetFirstLoginPassword,
       signup,
       logout
     }),

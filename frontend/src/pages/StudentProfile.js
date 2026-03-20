@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { students, profileUpdateRequests } from '../data/portalData';
+import { getUserProfile } from '../services/authService';
 import ThemeToggle from '../components/shared/ThemeToggle';
 import '../styles/profile.css';
 
@@ -12,10 +13,12 @@ function StudentProfile() {
   const [formData, setFormData] = useState({});
   const [updateReason, setUpdateReason] = useState('');
   const [submitMessage, setSubmitMessage] = useState('');
+  const [backendProfile, setBackendProfile] = useState(null);
 
   const currentStudent = useMemo(() => {
-    if (user?.rollNumber) {
-      const student = students.find((s) => s.rollNumber === user.rollNumber);
+    const profileIdentifier = user?.identifier || user?.rollNumber;
+    if (profileIdentifier) {
+      const student = students.find((s) => s.rollNumber === profileIdentifier);
       if (student) {
         setFormData(student);
         return student;
@@ -24,8 +27,47 @@ function StudentProfile() {
     return students[0];
   }, [user]);
 
+  const studentProfile = {
+    ...currentStudent,
+    ...(backendProfile || {}),
+    id: user?.id || currentStudent.id,
+    rollNumber: user?.identifier || currentStudent.rollNumber,
+    email: (backendProfile && backendProfile.email) || user?.email || currentStudent.email,
+    name: (backendProfile && backendProfile.name) || user?.name || currentStudent.name,
+    department: (backendProfile && backendProfile.department) || user?.department || currentStudent.department,
+    role: (backendProfile && backendProfile.role) || user?.role || 'student',
+    createdAt: (backendProfile && backendProfile.createdAt) || user?.createdAt || currentStudent.createdAt || null
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    const profileIdentifier = user?.identifier;
+
+    if (!profileIdentifier) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    getUserProfile(profileIdentifier)
+      .then((profile) => {
+        if (isMounted) {
+          setBackendProfile(profile);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setBackendProfile(null);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
   const pendingRequest = profileUpdateRequests.find(
-    (req) => req.userId === currentStudent.rollNumber && req.status === 'pending'
+    (req) => req.userId === studentProfile.rollNumber && req.status === 'pending'
   );
 
   const handleInputChange = (e) => {
@@ -41,7 +83,7 @@ function StudentProfile() {
     }
 
     const hasChanges = Object.keys(formData).some((key) => {
-      return key !== 'id' && key !== 'rollNumber' && key !== 'grade' && key !== 'initials' && formData[key] !== currentStudent[key];
+      return key !== 'id' && key !== 'rollNumber' && key !== 'grade' && key !== 'initials' && formData[key] !== studentProfile[key];
     });
 
     if (!hasChanges) {
@@ -56,7 +98,7 @@ function StudentProfile() {
   };
 
   const handleCancel = () => {
-    setFormData(currentStudent);
+    setFormData(studentProfile);
     setIsEditing(false);
   };
 
@@ -69,10 +111,10 @@ function StudentProfile() {
     <div className="portal-shell student-shell">
       <header className="portal-topbar">
         <div className="topbar-user">
-          <span className="topbar-avatar">{currentStudent.initials}</span>
+          <span className="topbar-avatar">{studentProfile.initials}</span>
           <div>
-            <p className="topbar-name">{currentStudent.name}</p>
-            <p className="topbar-meta">Student • {currentStudent.rollNumber}</p>
+            <p className="topbar-name">{studentProfile.name}</p>
+            <p className="topbar-meta">Student • {studentProfile.rollNumber}</p>
           </div>
         </div>
         <div className="topbar-actions">
@@ -116,10 +158,10 @@ function StudentProfile() {
 
           <section className="profile-section">
             <div className="profile-head">
-              <div className="profile-avatar-large">{currentStudent.initials}</div>
+              <div className="profile-avatar-large">{studentProfile.initials}</div>
               <div>
-                <h2>{currentStudent.name}</h2>
-                <p>{currentStudent.rollNumber}</p>
+                <h2>{studentProfile.name}</h2>
+                <p>{studentProfile.rollNumber}</p>
               </div>
             </div>
 
@@ -128,24 +170,80 @@ function StudentProfile() {
                 <div className="profile-view-mode">
                   <div className="info-grid">
                     <div className="info-item">
-                      <label>Name</label>
-                      <p>{currentStudent.name}</p>
+                      <label>ID</label>
+                      <p>{studentProfile.id}</p>
                     </div>
                     <div className="info-item">
-                      <label>Roll Number</label>
-                      <p>{currentStudent.rollNumber}</p>
+                      <label>Identifier</label>
+                      <p>{studentProfile.rollNumber}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Name</label>
+                      <p>{studentProfile.name}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Registration Number</label>
+                      <p>{studentProfile.registrationNo || 'NA'}</p>
                     </div>
                     <div className="info-item">
                       <label>Email</label>
-                      <p>{currentStudent.email}</p>
+                      <p>{studentProfile.email}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Role</label>
+                      <p>{studentProfile.role}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Department</label>
+                      <p>{studentProfile.department || 'NA'}</p>
                     </div>
                     <div className="info-item">
                       <label>Phone Number</label>
-                      <p>{currentStudent.phoneNumber}</p>
+                      <p>{studentProfile.phoneNumber || 'NA'}</p>
                     </div>
                     <div className="info-item">
                       <label>Grade</label>
-                      <p>{currentStudent.grade}</p>
+                      <p>{studentProfile.grade || 'NA'}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Semester</label>
+                      <p>{studentProfile.semester || 'NA'}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Section</label>
+                      <p>{studentProfile.section || 'NA'}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Batch Year</label>
+                      <p>{studentProfile.batchYear || 'NA'}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Date of Birth</label>
+                      <p>{studentProfile.dateOfBirth || 'NA'}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Guardian Name</label>
+                      <p>{studentProfile.guardianName || 'NA'}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Guardian Phone</label>
+                      <p>{studentProfile.guardianPhone || 'NA'}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Address</label>
+                      <p>{studentProfile.address || 'NA'}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Status</label>
+                      <p>{studentProfile.isActive ? 'Active' : 'Inactive'}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Created At</label>
+                      <p>{studentProfile.createdAt || 'NA'}</p>
+                    </div>
+                    <div className="info-item">
+                      <label>Updated At</label>
+                      <p>{studentProfile.updatedAt || 'NA'}</p>
                     </div>
                   </div>
 
@@ -155,7 +253,7 @@ function StudentProfile() {
                       className="primary-dark-btn"
                       onClick={() => {
                         setIsEditing(true);
-                        setFormData(currentStudent);
+                        setFormData(studentProfile);
                       }}
                     >
                       ✎ Edit Profile

@@ -55,6 +55,9 @@ function StudentDashboard() {
         </div>
         <div className="topbar-actions">
           <ThemeToggle />
+          <button type="button" className="outline-btn" onClick={() => navigate('/student/profile')}>
+            My Profile
+          </button>
           <button type="button" className="outline-btn" onClick={handleLogout}>Logout</button>
         </div>
       </header>

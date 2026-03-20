@@ -17,7 +17,7 @@ function Login() {
   const [resendSuccess, setResendSuccess] = useState(false);
   const [captchaVerified, setCaptchaVerified] = useState(false);
   const [otpTimeLeft, setOtpTimeLeft] = useState(0);
-  const { login, verifyOtp, resendOtp, forgotPassword } = useAuth();
+  const { login, verifyOtp, resendOtp, forgotPassword, resetFirstLoginPassword, logout } = useAuth();
   const navigate = useNavigate();
 
   // Cooldown timer effect
@@ -59,6 +59,31 @@ function Login() {
     else navigate('/student');
   };
 
+  const handleMandatoryPasswordReset = async (authenticatedUser) => {
+    if (!authenticatedUser?.requiresPasswordReset) {
+      return true;
+    }
+
+    alert('First-time login detected. You must reset your password before continuing.');
+
+    const newPassword = window.prompt('Enter a new password (minimum 6 characters):', '');
+    if (!newPassword) {
+      setError('Password reset is required on first login.');
+      logout();
+      return false;
+    }
+
+    const confirmPassword = window.prompt('Confirm your new password:', '');
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match. Please sign in again.');
+      logout();
+      return false;
+    }
+
+    await resetFirstLoginPassword(authenticatedUser.identifier, newPassword);
+    return true;
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
@@ -74,6 +99,10 @@ function Login() {
     try {
       if (otpSession) {
         const verifiedUser = await verifyOtp(otpSession.otpSessionId, otpCode);
+        const canContinue = await handleMandatoryPasswordReset(verifiedUser);
+        if (!canContinue) {
+          return;
+        }
         routeByRole(verifiedUser.role);
         return;
       }
@@ -84,6 +113,11 @@ function Login() {
         setOtpSession(loggedInUser);
         setOtpCode('');
         setCaptchaVerified(false);
+        return;
+      }
+
+      const canContinue = await handleMandatoryPasswordReset(loggedInUser);
+      if (!canContinue) {
         return;
       }
 
@@ -171,7 +205,7 @@ function Login() {
                 : 'OTP expired. Please resend OTP.'}
             </p>
             <div className="otp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={otpProgressPercent}>
-              <div className={`otp-progress-fill ${otpTimeLeft === 0 ? 'otp-progress-expired' : ''}`} style={{ width: `${otpProgressPercent}%` }} />
+              <div className={`otp-progress-fill ${otpTimeLeft === 0 ? 'otp-progress-expired' : ''}`} style={{ inlineSize: `${otpProgressPercent}%` }} />
             </div>
             <p className="otp-demo">For demo: OTP is {otpSession.demoOtp}</p>
           </>

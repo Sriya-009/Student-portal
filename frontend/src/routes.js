@@ -7,6 +7,7 @@ import FacultyDashboard from './pages/FacultyDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import StudentProfile from './pages/StudentProfile';
 import FacultyProfile from './pages/FacultyProfile';
+import AdminProfile from './pages/AdminProfile';
 import AssignTasks from './pages/AssignTasks';
 import UploadFiles from './pages/UploadFiles';
 import Progress from './pages/Progress';
@@ -20,6 +21,7 @@ function AppRoutes() {
 
       <Route element={<PrivateRoute allowedRoles={['admin']} />}>
         <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/profile" element={<AdminProfile />} />
       </Route>
 
       <Route element={<PrivateRoute allowedRoles={['faculty']} />}>

@@ -117,8 +117,45 @@ export async function verifyToken(token) {
   return payload.decoded;
 }
 
+export async function getUserProfile(identifier) {
+  const response = await fetch(`${API_BASE_URL}/api/profile/${encodeURIComponent(identifier)}`);
+  const payload = await parseResponse(response);
+  return payload.user;
+}
+
+export async function updateUserProfile(identifier, profilePatch) {
+  const response = await fetch(`${API_BASE_URL}/api/profile/${encodeURIComponent(identifier)}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(profilePatch)
+  });
+
+  const payload = await parseResponse(response);
+  return payload.user;
+}
+
+export async function resetInitialPassword(identifier, newPassword) {
+  const response = await fetch(`${API_BASE_URL}/api/auth/reset-initial-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ identifier, newPassword })
+  });
+
+  const payload = await parseResponse(response);
+  return payload.user;
+}
+
 export async function registerAdminCreatedUser({ identifier, name, email, department, role, phone }) {
-  const defaultPassword = String(role || '').toLowerCase() === 'student' ? 'student123' : 'faculty123';
+  const normalizedRole = String(role || '').toLowerCase();
+  const defaultPassword = normalizedRole === 'student'
+    ? 'stident123'
+    : normalizedRole === 'faculty'
+      ? 'faculty123'
+      : 'admin009';
 
   const response = await fetch(`${API_BASE_URL}/api/users`, {
     method: 'POST',
