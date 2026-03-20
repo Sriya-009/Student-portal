@@ -77,10 +77,10 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
       return;
     }
 
-    // For students, validate rollNumber format
+    // For students, validate 10-digit ID not starting with 0.
     if (newUser.role === 'student') {
-      if (!newUser.id.match(/^STU\d{3}$/i)) {
-        alert('Student ID must follow format: STU001 (STU + 3 digits)');
+      if (!newUser.id.match(/^[1-9]\d{9}$/)) {
+        alert('Student ID must be exactly 10 digits and cannot start with 0.');
         return;
       }
       
@@ -94,10 +94,10 @@ function AdminControlCenter({ students, mentors, projects, files, submissionEven
       }
     }
 
-    // For faculty, validate faculty ID format
+    // For faculty, validate 4-digit numeric ID.
     if (newUser.role === 'faculty') {
-      if (!newUser.id.match(/^(MENTOR|FAC|FACULTY)-\d{3}$/i)) {
-        alert('Faculty ID must follow format: MENTOR-001 or FAC-001');
+      if (!newUser.id.match(/^\d{4}$/)) {
+        alert('Faculty ID must be exactly 4 digits.');
         return;
       }
 

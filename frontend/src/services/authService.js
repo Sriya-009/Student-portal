@@ -88,13 +88,13 @@ export async function requestPasswordReset(identifier) {
   };
 }
 
-export async function signupUser(name, email, password, role = 'student') {
+export async function signupUser(identifier, name, email, password, role = 'student') {
   const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ name, email, password, role })
+    body: JSON.stringify({ identifier, name, email, password, role })
   });
 
   const payload = await parseResponse(response);

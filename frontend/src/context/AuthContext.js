@@ -23,8 +23,8 @@ export function AuthProvider({ children }) {
     return loggedInStaff;
   };
 
-  const signup = async (name, email, password, role) => {
-    const createdUser = await signupUser(name, email, password, role);
+  const signup = async (identifier, name, email, password, role) => {
+    const createdUser = await signupUser(identifier, name, email, password, role);
     setUser(createdUser);
     return createdUser;
   };
