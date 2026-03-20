@@ -412,7 +412,43 @@ body.dark-mode .secondary-btn {
   border-color: #475569;
 }
 
+/* Password Field Visibility Toggle */
+.password-field-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-field-wrapper input {
+  padding-inline-end: 50px;
+}
+
+.toggle-password-btn {
+  position: absolute;
+  inset-inline-end: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+  color: #606d83;
+}
+
+.toggle-password-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.toggle-password-btn:active {
+  background-color: #e0e0e0;
+}
+
 @media (max-width: 1200px) {
+
   .auth-brand h1 {
     font-size: 34px;
   }

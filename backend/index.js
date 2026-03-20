@@ -4,6 +4,11 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { getPool, testConnection } = require('./db');
 
 const app = express();
@@ -46,6 +51,7 @@ const USER_SELECT_FIELDS = [
   'two_factor_enabled',
   'is_active',
   'must_reset_password',
+  'photo_url',
   'created_at',
   'updated_at'
 ].join(', ');
@@ -77,8 +83,60 @@ const PROFILE_FIELD_MAP = {
   isActive: 'is_active'
 };
 
+// ========== SECURITY MIDDLEWARE ==========
+app.use(helmet());
+
+const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Too many login attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const apiRateLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 100,
+  message: 'Too many requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// ========== FILE UPLOAD CONFIG ==========
+const uploadsDir = path.join(__dirname, 'uploads', 'profile-photos');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+const fileFilter = (_req, file, cb) => {
+  const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'));
+  }
+};
+
+const uploadMiddleware = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
 app.use(cors());
 app.use(express.json());
+app.use(apiRateLimiter);
+app.use('/uploads', express.static(uploadsDir));
 
 function maskPhone(phoneNumber) {
   const digits = (phoneNumber || '').replace(/\D/g, '');
@@ -109,11 +167,44 @@ function createAuthToken(user) {
     {
       sub: user.identifier,
       role: user.role,
-      email: user.email
+      email: user.email,
+      type: 'access'
     },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   );
+}
+
+function verifyAuthToken(token) {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.type !== 'access') {
+      throw new Error('Invalid token type');
+    }
+    return decoded;
+  } catch (error) {
+    throw new Error(`Token verification failed: ${error.message}`);
+  }
+}
+
+function validatePasswordStrength(password) {
+  const errors = [];
+  if (password.length < 8) {
+    errors.push('Password must be at least 8 characters');
+  }
+  if (!/[A-Z]/.test(password)) {
+    errors.push('Password must contain uppercase letter');
+  }
+  if (!/[a-z]/.test(password)) {
+    errors.push('Password must contain lowercase letter');
+  }
+  if (!/\d/.test(password)) {
+    errors.push('Password must contain number');
+  }
+  if (!/[!@#$%^&*]/.test(password)) {
+    errors.push('Password must contain special character (!@#$%^&*)');
+  }
+  return errors;
 }
 
 function isBcryptHash(value) {
@@ -382,7 +473,7 @@ app.patch('/api/profile/:identifier', async (req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
   const { identifier, password } = req.body;
 
   if (!identifier || !password) {
@@ -679,6 +770,118 @@ app.post('/api/users', async (req, res) => {
     if (error && error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ ok: false, error: 'User already exists with this identifier or email.' });
     }
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// ========== DASHBOARD STATS ENDPOINTS ==========
+app.get('/api/stats/dashboard', async (_req, res) => {
+  try {
+    const pool = getPool();
+    const [studentCount] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = ?', ['student']);
+    const [facultyCount] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = ?', ['faculty']);
+    const [adminCount] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = ?', ['admin']);
+    const [totalUsers] = await pool.query('SELECT COUNT(*) as count FROM users');
+
+    return res.json({
+      ok: true,
+      stats: {
+        totalUsers: totalUsers[0]?.count || 0,
+        students: studentCount[0]?.count || 0,
+        faculty: facultyCount[0]?.count || 0,
+        admins: adminCount[0]?.count || 0
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// ========== FILE UPLOAD ENDPOINTS ==========
+app.post('/api/upload/profile-photo/:identifier', uploadMiddleware.single('profilePhoto'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ ok: false, error: 'No file provided' });
+    }
+
+    const { identifier } = req.params;
+    if (!identifier) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ ok: false, error: 'Identifier is required' });
+    }
+
+    const pool = getPool();
+    const photoUrl = `/uploads/profile-photos/${req.file.filename}`;
+
+    // Update user with photo URL
+    await pool.query(
+      'UPDATE users SET photo_url = ?, updated_at = NOW() WHERE identifier = ?',
+      [photoUrl, identifier]
+    );
+
+    return res.json({
+      ok: true,
+      message: 'Profile photo uploaded successfully',
+      photoUrl
+    });
+  } catch (error) {
+    if (req.file && req.file.path) {
+      fs.unlinkSync(req.file.path);
+    }
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get('/api/profile-photo/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const pool = getPool();
+
+    const [rows] = await pool.query(
+      'SELECT photo_url FROM users WHERE identifier = ?',
+      [identifier]
+    );
+
+    if (!rows[0] || !rows[0].photo_url) {
+      return res.status(404).json({ ok: false, error: 'Photo not found' });
+    }
+
+    return res.json({
+      ok: true,
+      photoUrl: rows[0].photo_url
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.delete('/api/profile-photo/:identifier', async (req, res) => {
+  try {
+    const { identifier } = req.params;
+    const pool = getPool();
+
+    const [rows] = await pool.query(
+      'SELECT photo_url FROM users WHERE identifier = ?',
+      [identifier]
+    );
+
+    if (rows[0]?.photo_url) {
+      const filePath = path.join(__dirname, rows[0].photo_url);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    await pool.query(
+      'UPDATE users SET photo_url = NULL, updated_at = NOW() WHERE identifier = ?',
+      [identifier]
+    );
+
+    return res.json({
+      ok: true,
+      message: 'Profile photo deleted successfully'
+    });
+  } catch (error) {
     return res.status(500).json({ ok: false, error: error.message });
   }
 });

@@ -7,6 +7,7 @@ import '../styles/auth.css';
 function Login() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [otpSession, setOtpSession] = useState(null);
   const [error, setError] = useState('');
@@ -225,17 +226,27 @@ function Login() {
             />
 
             <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(event) => {
-                setPassword(event.target.value);
-                setCaptchaVerified(false);
-              }}
-              required
-            />
+            <div className="password-field-wrapper">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Password"
+                value={password}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  setCaptchaVerified(false);
+                }}
+                required
+              />
+              <button
+                type="button"
+                className="toggle-password-btn"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? '👁️' : '👁️‍🗨️'}
+              </button>
+            </div>
 
             <Captcha onVerify={setCaptchaVerified} />
           </>
