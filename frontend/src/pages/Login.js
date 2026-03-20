@@ -149,7 +149,7 @@ function Login() {
       <form className="auth-form" onSubmit={handleSubmit}>
         <h2>Sign In</h2>
         {otpSession ? (
-          <p className="auth-subtext">OTP sent to registered phone {otpSession.maskedPhone}</p>
+          <p className="auth-subtext">OTP sent to registered mail id {otpSession.maskedPhone}</p>
         ) : null}
 
         {otpSession ? (
