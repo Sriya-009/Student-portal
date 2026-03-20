@@ -245,12 +245,6 @@ function Login() {
           </div>
         ) : null}
 
-        <div className="demo-box">
-          <p>Demo Credentials:</p>
-          <p><strong>Student Roll Number:</strong> STU001, STU002, STU003, or STU004<br /><strong>Password:</strong> student123</p>
-          <p><strong>Faculty Email:</strong> faculty@school.com<br /><strong>Password:</strong> faculty123</p>
-          <p><strong>Admin ID:</strong> admin<br /><strong>Password:</strong> admin123</p>
-        </div>
       </form>
     </main>
   );
