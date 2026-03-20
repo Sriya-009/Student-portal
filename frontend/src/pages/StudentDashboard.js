@@ -1,32 +1,54 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import SubmissionCalendar from '../components/shared/SubmissionCalendar';
-import ProjectManagement from '../components/student/ProjectManagement';
 import ThemeToggle from '../components/shared/ThemeToggle';
 import ProjectWorkspaceSidebar from '../components/student/ProjectWorkspaceSidebar';
 import NotificationPanel from '../components/student/NotificationPanel';
-import { students, submissionEvents } from '../data/portalData';
+import { getAllProjects } from '../services/authService';
 import '../styles/dashboard.css';
 
 function StudentDashboard() {
   const [workspaceAction, setWorkspaceAction] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [projects, setProjects] = useState([]);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    let isMounted = true;
+    const studentIdentifier = String(user?.identifier || '').trim().toLowerCase();
+
+    getAllProjects()
+      .then((allProjects) => {
+        if (!isMounted) return;
+        const mine = (allProjects || []).filter((project) => {
+          const owner = String(project.ownerIdentifier || '').trim().toLowerCase();
+          return owner && owner === studentIdentifier;
+        });
+        setProjects(mine);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setProjects([]);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
   const currentStudent = useMemo(() => {
-    if (user) {
-      return {
-        name: user.name,
-        identifier: user.identifier,
-        initials: user.name.charAt(0).toUpperCase(),
-        email: user.email,
-        rollNumber: user.identifier,
-        department: user.department || 'Computer Science'
-      };
-    }
-    return students[0];
+    const name = user?.name || 'Student';
+    const identifier = user?.identifier || 'NA';
+    return {
+      name,
+      identifier,
+      initials: (name.charAt(0) || 'S').toUpperCase(),
+      email: user?.email || '',
+      rollNumber: identifier,
+      department: user?.department || ''
+    };
   }, [user]);
 
   const handleLogout = () => {
@@ -77,7 +99,7 @@ function StudentDashboard() {
           </section>
 
           <NotificationPanel 
-            events={submissionEvents}
+            events={[]}
             studentId={currentStudent.rollNumber}
             phoneNumber={currentStudent.phoneNumber}
             studentName={currentStudent.name}
@@ -85,16 +107,30 @@ function StudentDashboard() {
 
           {showCalendar && (
             <SubmissionCalendar
-              events={submissionEvents}
+              events={[]}
               title="Upcoming Deadlines"
               showCourseFilter={false}
             />
           )}
 
-          <ProjectManagement
-            studentId={currentStudent.rollNumber}
-            workspaceAction={workspaceAction}
-          />
+          <section className="faculty-panel">
+            <h3>My Projects</h3>
+            {projects.length === 0 ? (
+              <p className="empty-state">No projects available in the database for your account.</p>
+            ) : (
+              <div className="proposals-list">
+                {projects.map((project) => (
+                  <div key={project.id} className="proposal-card">
+                    <h4>{project.name}</h4>
+                    <p className="proposal-desc">{project.description || 'No description provided.'}</p>
+                    <p className="proposal-meta">Status: <strong>{project.status || 'ongoing'}</strong></p>
+                    <p className="proposal-meta">Deadline: <strong>{project.deadline || 'NA'}</strong></p>
+                    <p className="proposal-meta">Progress: <strong>{project.progressPercent || 0}%</strong></p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </main>
       </div>
     </div>

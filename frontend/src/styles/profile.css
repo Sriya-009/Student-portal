@@ -109,9 +109,18 @@
 
 .profile-edit-form {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
   inline-size: 100%;
   max-inline-size: none;
+}
+
+.profile-edit-form .form-actions {
+  grid-column: 1 / -1;
+}
+
+.portal-layout > .portal-main:only-child {
+  grid-column: 1 / -1;
 }
 
 .form-group {

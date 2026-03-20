@@ -13,7 +13,6 @@ import GradingPanel from '../components/faculty/GradingPanel';
 import ReportsAnalyticsPanel from '../components/faculty/ReportsAnalyticsPanel';
 import FinalActionsPanel from '../components/faculty/FinalActionsPanel';
 import StudentSearchPanel from '../components/faculty/StudentSearchPanel';
-import { mentors, projectProposals, projectGrades, projectTasks, projectFiles } from '../data/portalData';
 import { getAllProjects, getAllUsers } from '../services/authService';
 import '../styles/dashboard.css';
 
@@ -21,6 +20,7 @@ function FacultyDashboard() {
   const [activeView, setActiveView] = useState('approval');
   const [activeAction, setActiveAction] = useState('approval-review');
   const [registeredStudents, setRegisteredStudents] = useState([]);
+  const [registeredFaculty, setRegisteredFaculty] = useState([]);
   const [registeredProjects, setRegisteredProjects] = useState([]);
   const [studentSearchError, setStudentSearchError] = useState('');
   const [projectLoadError, setProjectLoadError] = useState('');
@@ -58,11 +58,20 @@ function FacultyDashboard() {
           }));
 
         setRegisteredStudents(onlyStudents);
+        setRegisteredFaculty(
+          users.filter((entry) => String(entry.role || '').toLowerCase() === 'faculty').map((entry) => ({
+            id: entry.identifier,
+            identifier: entry.identifier,
+            name: entry.name,
+            specialization: entry.specialization || ''
+          }))
+        );
         setStudentSearchError('');
       })
       .catch((error) => {
         if (!isMounted) return;
         setRegisteredStudents([]);
+        setRegisteredFaculty([]);
         setStudentSearchError(error.message || 'Failed to load registered students');
       });
 
@@ -92,14 +101,14 @@ function FacultyDashboard() {
   }, []);
 
   const currentFaculty = useMemo(() => {
-    const profileIdentifier = user?.identifier || user?.facultyId;
-    if (profileIdentifier) {
-      const byId = mentors.find(
-        (mentor) => mentor.id === profileIdentifier || mentor.identifier === profileIdentifier
-      );
-      if (byId) return byId;
-    }
-    return mentors[0];
+    const name = user?.name || 'Faculty';
+    return {
+      id: user?.identifier || user?.facultyId || 'NA',
+      name,
+      department: user?.department || '',
+      specialization: user?.specialization || '',
+      initials: (name.charAt(0) || 'F').toUpperCase()
+    };
   }, [user]);
 
   const handleLogout = () => {
@@ -112,42 +121,38 @@ function FacultyDashboard() {
       case 'approval':
         return (
           <ProjectApprovalPanel
-            proposals={projectProposals}
-            mentors={mentors}
+            proposals={[]}
+            mentors={registeredFaculty}
             projects={registeredProjects}
             students={registeredStudents}
             activeAction={activeAction}
           />
         );
       case 'monitoring':
-        return <ProjectMonitoringPanel projects={registeredProjects} tasks={projectTasks} activeAction={activeAction} />;
+        return <ProjectMonitoringPanel projects={registeredProjects} tasks={[]} activeAction={activeAction} />;
       case 'tasks':
-        return <TaskOversightPanel tasks={projectTasks} studentsMap={getStudentMap()} activeAction={activeAction} />;
+        return <TaskOversightPanel tasks={[]} studentsMap={getStudentMap()} activeAction={activeAction} />;
       case 'files':
-        return <FileReviewPanel files={projectFiles} projects={registeredProjects} activeAction={activeAction} />;
+        return <FileReviewPanel files={[]} projects={registeredProjects} activeAction={activeAction} />;
       case 'student-search':
         return <StudentSearchPanel students={registeredStudents} activeAction={activeAction} error={studentSearchError} />;
       case 'communication':
         return <CommunicationPanel facultyId={currentFaculty.id} activeAction={activeAction} />;
       case 'feedback':
-        return <FeedbackEvaluationPanel grades={projectGrades} facultyId={currentFaculty.id} activeAction={activeAction} />;
+        return <FeedbackEvaluationPanel grades={[]} facultyId={currentFaculty.id} activeAction={activeAction} />;
       case 'grading':
-        return <GradingPanel grades={projectGrades} projects={registeredProjects} />;
+        return <GradingPanel grades={[]} projects={registeredProjects} />;
       case 'reports':
-        return <ReportsAnalyticsPanel projects={registeredProjects} grades={projectGrades} activeAction={activeAction} />;
+        return <ReportsAnalyticsPanel projects={registeredProjects} grades={[]} activeAction={activeAction} />;
       case 'final-actions':
         return <FinalActionsPanel projects={registeredProjects} activeAction={activeAction} />;
       default:
-        return <ProjectApprovalPanel proposals={projectProposals} mentors={mentors} projects={registeredProjects} students={registeredStudents} />;
+        return <ProjectApprovalPanel proposals={[]} mentors={registeredFaculty} projects={registeredProjects} students={registeredStudents} />;
     }
   };
 
   const getStudentMap = () => {
-    const map = {};
-    projectTasks.forEach((task) => {
-      map[task.assignedToId] = task.assignedToName;
-    });
-    return map;
+    return {};
   };
 
   return (

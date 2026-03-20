@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { mentors, profileUpdateRequests } from '../data/portalData';
 import { deleteProfilePhoto, getProfilePhotoUrl, getUserProfile, uploadProfilePhoto } from '../services/authService';
 import ThemeToggle from '../components/shared/ThemeToggle';
 import '../styles/profile.css';
@@ -30,18 +29,32 @@ function FacultyProfile() {
   const [photoLoading, setPhotoLoading] = useState(false);
 
   const currentFaculty = useMemo(() => {
-    const profileIdentifier = user?.identifier || user?.facultyId;
-    if (profileIdentifier) {
-      const mentor = mentors.find(
-        (m) => m.id === profileIdentifier || m.identifier === profileIdentifier
-      );
-      if (mentor) {
-        setFormData(mentor);
-        return mentor;
-      }
-    }
-    return mentors[0];
-  }, [user]);
+    const name = backendProfile?.name || user?.name || 'Faculty';
+    const identifier = backendProfile?.identifier || user?.identifier || user?.facultyId || 'NA';
+    return {
+      id: identifier,
+      identifier,
+      name,
+      email: backendProfile?.email || user?.email || '',
+      department: backendProfile?.department || user?.department || '',
+      role: backendProfile?.role || user?.role || 'faculty',
+      createdAt: backendProfile?.createdAt || user?.createdAt || null,
+      employeeId: backendProfile?.employeeId || '',
+      specialization: backendProfile?.specialization || '',
+      designation: backendProfile?.designation || '',
+      qualification: backendProfile?.qualification || '',
+      phoneNumber: backendProfile?.phoneNumber || '',
+      officeLocation: backendProfile?.officeLocation || '',
+      officeHours: backendProfile?.officeHours || '',
+      joiningDate: backendProfile?.joiningDate || '',
+      isActive: backendProfile?.isActive ?? true,
+      updatedAt: backendProfile?.updatedAt || null,
+      bio: backendProfile?.bio || '',
+      assignedStudents: [],
+      assignedProjects: [],
+      initials: (String(name).trim().charAt(0) || 'F').toUpperCase()
+    };
+  }, [backendProfile, user]);
 
   const facultyProfile = {
     ...currentFaculty,
@@ -145,9 +158,7 @@ function FacultyProfile() {
     }
   };
 
-  const pendingRequest = profileUpdateRequests.find(
-    (req) => req.userId === facultyProfile.id && req.status === 'pending'
-  );
+  const pendingRequest = null;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

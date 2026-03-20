@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { students, profileUpdateRequests } from '../data/portalData';
 import { deleteProfilePhoto, getProfilePhotoUrl, getUserProfile, uploadProfilePhoto } from '../services/authService';
 import ThemeToggle from '../components/shared/ThemeToggle';
 import '../styles/profile.css';
@@ -30,16 +29,31 @@ function StudentProfile() {
   const [photoLoading, setPhotoLoading] = useState(false);
 
   const currentStudent = useMemo(() => {
-    const profileIdentifier = user?.identifier || user?.rollNumber;
-    if (profileIdentifier) {
-      const student = students.find((s) => s.rollNumber === profileIdentifier);
-      if (student) {
-        setFormData(student);
-        return student;
-      }
-    }
-    return students[0];
-  }, [user]);
+    const name = backendProfile?.name || user?.name || 'Student';
+    const identifier = backendProfile?.identifier || user?.identifier || user?.rollNumber || 'NA';
+    return {
+      id: backendProfile?.id || user?.id || identifier,
+      rollNumber: identifier,
+      name,
+      email: backendProfile?.email || user?.email || '',
+      department: backendProfile?.department || user?.department || '',
+      role: backendProfile?.role || user?.role || 'student',
+      createdAt: backendProfile?.createdAt || user?.createdAt || null,
+      registrationNo: backendProfile?.registrationNo || '',
+      semester: backendProfile?.semester || '',
+      section: backendProfile?.section || '',
+      batchYear: backendProfile?.batchYear || '',
+      dateOfBirth: backendProfile?.dateOfBirth || '',
+      guardianName: backendProfile?.guardianName || '',
+      guardianPhone: backendProfile?.guardianPhone || '',
+      address: backendProfile?.address || '',
+      phoneNumber: backendProfile?.phoneNumber || '',
+      grade: backendProfile?.grade || '',
+      initials: (String(name).trim().charAt(0) || 'S').toUpperCase(),
+      isActive: backendProfile?.isActive ?? true,
+      updatedAt: backendProfile?.updatedAt || null
+    };
+  }, [backendProfile, user]);
 
   const studentProfile = {
     ...currentStudent,
@@ -144,9 +158,7 @@ function StudentProfile() {
     }
   };
 
-  const pendingRequest = profileUpdateRequests.find(
-    (req) => req.userId === studentProfile.rollNumber && req.status === 'pending'
-  );
+  const pendingRequest = null;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;

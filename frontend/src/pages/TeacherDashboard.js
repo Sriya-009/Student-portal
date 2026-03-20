@@ -2,8 +2,9 @@ import Navbar from '../components/shared/Navbar';
 import Sidebar from '../components/shared/Sidebar';
 import Card from '../components/shared/Card';
 import SubmissionCalendar from '../components/shared/SubmissionCalendar';
-import { submissionEvents } from '../data/portalData';
 import '../styles/dashboard.css';
+
+const submissionEvents = [];
 
 const links = [
   { to: '/faculty', label: 'Faculty Home' },

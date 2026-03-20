@@ -1,7 +1,13 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { bTechProjects, projectChats, projectTasks, projectFiles, projectProposals, projectGrades } from '../../data/portalData';
 import TaskManagement from './TaskManagement';
 import FileManagement from './FileManagement';
+
+const bTechProjects = [];
+const projectChats = [];
+const projectTasks = [];
+const projectFiles = [];
+const projectProposals = [];
+const projectGrades = [];
 
 function ProjectManagement({ studentId, workspaceAction }) {
   const [projects, setProjects] = useState(bTechProjects);

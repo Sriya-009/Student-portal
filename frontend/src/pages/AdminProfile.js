@@ -2,7 +2,6 @@ import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ThemeToggle from '../components/shared/ThemeToggle';
-import { admins } from '../data/portalData';
 import {
   deleteProfilePhoto,
   getProfilePhotoUrl,
@@ -91,21 +90,19 @@ function AdminProfile() {
   }, [user]);
 
   const currentAdmin = useMemo(() => {
-    const identifier = user?.identifier || user?.id;
-    const matchedAdmin = admins.find(
-      (admin) => admin.identifier === identifier || admin.id === identifier
-    );
+    const name = backendProfile?.name || user?.name || 'Admin';
+    const identifier = backendProfile?.identifier || user?.identifier || user?.id || 'NA';
 
     return {
-      ...(matchedAdmin || admins[0]),
       ...(backendProfile || {}),
-      id: user?.id || matchedAdmin?.id || admins[0].id,
-      identifier: user?.identifier || matchedAdmin?.identifier || admins[0].identifier,
-      name: (backendProfile && backendProfile.name) || user?.name || matchedAdmin?.name || admins[0].name,
-      email: (backendProfile && backendProfile.email) || user?.email || matchedAdmin?.email || admins[0].email,
-      role: (backendProfile && backendProfile.role) || user?.role || matchedAdmin?.role || 'admin',
-      department: (backendProfile && backendProfile.department) || user?.department || matchedAdmin?.department || 'Administration',
-      createdAt: (backendProfile && backendProfile.createdAt) || user?.createdAt || matchedAdmin?.createdAt || null
+      id: backendProfile?.id || user?.id || identifier,
+      identifier,
+      name,
+      email: backendProfile?.email || user?.email || '',
+      role: backendProfile?.role || user?.role || 'admin',
+      department: backendProfile?.department || user?.department || 'Administration',
+      createdAt: backendProfile?.createdAt || user?.createdAt || null,
+      initials: (String(name).trim().charAt(0) || 'A').toUpperCase()
     };
   }, [user, backendProfile]);
 

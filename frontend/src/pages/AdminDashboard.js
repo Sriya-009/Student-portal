@@ -1,16 +1,48 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminControlCenter from '../components/admin/AdminControlCenter';
 import AdminWorkspaceSidebar from '../components/admin/AdminWorkspaceSidebar';
 import { useAuth } from '../context/AuthContext';
-import { students, mentors, bTechProjects, projectFiles, submissionEvents } from '../data/portalData';
+import { getAllProjects, getAllUsers } from '../services/authService';
 import '../styles/dashboard.css';
 
 function AdminDashboard() {
   const [activeSection, setActiveSection] = useState('user-management');
   const [activeAction, setActiveAction] = useState('user-add-register');
+  const [allUsers, setAllUsers] = useState([]);
+  const [allProjects, setAllProjects] = useState([]);
   const { logout } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.all([getAllUsers(), getAllProjects()])
+      .then(([users, projects]) => {
+        if (!isMounted) return;
+        setAllUsers(users || []);
+        setAllProjects(projects || []);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setAllUsers([]);
+        setAllProjects([]);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const students = useMemo(
+    () => allUsers.filter((entry) => String(entry.role || '').toLowerCase() === 'student'),
+    [allUsers]
+  );
+
+  const mentors = useMemo(
+    () => allUsers.filter((entry) => String(entry.role || '').toLowerCase() === 'faculty'),
+    [allUsers]
+  );
 
   const handleLogout = () => {
     logout();
@@ -66,9 +98,9 @@ function AdminDashboard() {
           <AdminControlCenter
             students={students}
             mentors={mentors}
-            projects={bTechProjects}
-            files={projectFiles}
-            submissionEvents={submissionEvents}
+            projects={allProjects}
+            files={[]}
+            submissionEvents={[]}
             activeSection={activeSection}
             activeAction={activeAction}
           />
