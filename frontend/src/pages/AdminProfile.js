@@ -11,7 +11,7 @@ import {
 } from '../services/authService';
 import '../styles/profile.css';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://54.144.255.74:5000';
 
 function toAbsolutePhotoUrl(photoUrl) {
   if (!photoUrl) {
