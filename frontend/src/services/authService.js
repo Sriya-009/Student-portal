@@ -7,12 +7,25 @@ function toNetworkError(error) {
   return error;
 }
 
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 async function apiRequest(path, options = {}) {
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, options);
     return parseResponse(response);
   } catch (error) {
-    throw toNetworkError(error);
+    if (error instanceof TypeError) {
+      await wait(1200);
+      try {
+        const retryResponse = await fetch(`${API_BASE_URL}${path}`, options);
+        return parseResponse(retryResponse);
+      } catch (retryError) {
+        throw toNetworkError(retryError);
+      }
+    }
+    throw error;
   }
 }
 

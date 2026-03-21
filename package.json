@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "client": "npm run start:ui --prefix frontend",
+    "client": "npm run start --prefix frontend",
     "server": "npm run dev --prefix backend",
     "start": "npm run dev",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "dev": "npm run client",
     "build": "npm install --prefix frontend && npm run build --prefix frontend"
   },
   "devDependencies": {
