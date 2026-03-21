@@ -98,7 +98,7 @@ Returns aggregate statistics for admin dashboards.
 **Usage**:
 ```javascript
 // Frontend
-const response = await fetch('http://localhost:5000/api/stats/dashboard');
+const response = await fetch('http://54.144.255.74:5000/api/stats/dashboard');
 const data = await response.json();
 console.log(`Total Students: ${data.stats.students}`);
 console.log(`Total Faculty: ${data.stats.faculty}`);
@@ -139,7 +139,7 @@ Content-Type: multipart/form-data
 **Example - cURL**:
 ```bash
 curl -X POST \
-  "http://localhost:5000/api/upload/profile-photo/STU001" \
+  "http://54.144.255.74:5000/api/upload/profile-photo/STU001" \
   -F "profilePhoto=@/path/to/photo.jpg"
 ```
 
@@ -149,7 +149,7 @@ const formData = new FormData();
 formData.append('profilePhoto', fileInput.files[0]);
 
 const response = await fetch(
-  'http://localhost:5000/api/upload/profile-photo/STU001',
+  'http://54.144.255.74:5000/api/upload/profile-photo/STU001',
   {
     method: 'POST',
     body: formData
@@ -173,7 +173,7 @@ console.log(data.photoUrl); // Access the uploaded photo URL
 **Example**:
 ```javascript
 const response = await fetch(
-  'http://localhost:5000/api/profile-photo/STU001'
+  'http://54.144.255.74:5000/api/profile-photo/STU001'
 );
 const data = await response.json();
 // Use in img src: <img src={data.photoUrl} />
@@ -193,7 +193,7 @@ const data = await response.json();
 **Example**:
 ```javascript
 const response = await fetch(
-  'http://localhost:5000/api/profile-photo/STU001',
+  'http://54.144.255.74:5000/api/profile-photo/STU001',
   { method: 'DELETE' }
 );
 ```

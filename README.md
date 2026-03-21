@@ -70,6 +70,6 @@ student-project-manager/
 `npm start`
 
 6. Verify backend + database health:
-`http://localhost:5000/api/health`
+`http://54.144.255.74:5000/api/health`
 
 When admin creates a new user, the project now also attempts to persist that user in MySQL via the backend API.

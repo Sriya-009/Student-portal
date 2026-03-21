@@ -77,7 +77,7 @@ DELETE /api/profile-photo/:identifier           - Remove photo
   
 - ✅ **Static File Serving**:
   - `/uploads` route serves profile photos
-  - Accessible at: `http://localhost:5000/uploads/profile-photos/{filename}`
+  - Accessible at: `http://54.144.255.74:5000/uploads/profile-photos/{filename}`
   
 - ✅ **Cleanup**:
   - Automatic file deletion when photo deleted
@@ -190,24 +190,24 @@ Topics covered:
 
 ### 1. Test Dashboard Stats:
 ```bash
-curl http://localhost:5000/api/stats/dashboard
+curl http://54.144.255.74:5000/api/stats/dashboard
 ```
 
 ### 2. Upload Profile Photo:
 ```bash
 curl -X POST \
-  "http://localhost:5000/api/upload/profile-photo/STU001" \
+  "http://54.144.255.74:5000/api/upload/profile-photo/STU001" \
   -F "profilePhoto=@/path/to/photo.jpg"
 ```
 
 ### 3. Get Photo URL:
 ```bash
-curl http://localhost:5000/api/profile-photo/STU001
+curl http://54.144.255.74:5000/api/profile-photo/STU001
 ```
 
 ### 4. Test Health Check:
 ```bash
-curl http://localhost:5000/api/health
+curl http://54.144.255.74:5000/api/health
 ```
 
 ---
