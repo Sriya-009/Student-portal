@@ -1,5 +1,21 @@
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
+function toNetworkError(error) {
+  if (error instanceof TypeError) {
+    return new Error(`Cannot reach API server at ${API_BASE_URL}. Start backend with "npm run dev" from project root.`);
+  }
+  return error;
+}
+
+async function apiRequest(path, options = {}) {
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, options);
+    return parseResponse(response);
+  } catch (error) {
+    throw toNetworkError(error);
+  }
+}
+
 async function parseResponse(response) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || payload.ok === false) {
@@ -9,15 +25,13 @@ async function parseResponse(response) {
 }
 
 export async function loginUser(identifier, password) {
-  const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+  const payload = await apiRequest('/api/auth/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ identifier, password })
   });
-
-  const payload = await parseResponse(response);
 
   if (payload.requiresOtp) {
     return {
@@ -37,15 +51,13 @@ export async function loginUser(identifier, password) {
 }
 
 export async function verifyStaffOtp(otpSessionId, otpCode) {
-  const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
+  const payload = await apiRequest('/api/auth/verify-otp', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ otpSessionId, otpCode })
   });
-
-  const payload = await parseResponse(response);
   return {
     ...payload.user,
     token: payload.token
@@ -53,15 +65,13 @@ export async function verifyStaffOtp(otpSessionId, otpCode) {
 }
 
 export async function resendOtp(otpSessionId) {
-  const response = await fetch(`${API_BASE_URL}/api/auth/resend-otp`, {
+  const payload = await apiRequest('/api/auth/resend-otp', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ otpSessionId })
   });
-
-  const payload = await parseResponse(response);
   return {
     otpSent: payload.otpSent,
     maskedPhone: payload.maskedPhone,
@@ -73,15 +83,13 @@ export async function resendOtp(otpSessionId) {
 }
 
 export async function requestPasswordReset(identifier) {
-  const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+  const payload = await apiRequest('/api/auth/forgot-password', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ identifier })
   });
-
-  const payload = await parseResponse(response);
   return {
     success: payload.success,
     message: payload.message
