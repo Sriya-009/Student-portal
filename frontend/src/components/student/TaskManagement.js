@@ -14,6 +14,10 @@ function TaskManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
   const projectTasksFiltered = tasks.filter((t) => t.projectId === projectId);
 
   useEffect(() => {
+    setTasks(projectTasks || []);
+  }, [projectId, projectTasks]);
+
+  useEffect(() => {
     if (!actionMode) return;
     if ((actionMode === 'task-create' || actionMode === 'task-assign') && isProjectLead) {
       setShowCreateForm(true);
@@ -236,7 +240,7 @@ function TaskManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
                   <span>Contribution: {data.totalContribution}%</span>
                 </div>
                 <div className="contribution-bar">
-                  <div className="contribution-fill" style={{ width: `${data.totalContribution}%` }} />
+                  <div className="contribution-fill" style={{ inlineSize: `${data.totalContribution}%` }} />
                 </div>
               </div>
             ))

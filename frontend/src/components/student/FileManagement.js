@@ -13,6 +13,10 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
   const isProjectSubmitted = projectFilesList.some((f) => f.isSubmitted);
 
   useEffect(() => {
+    setFiles(projectFiles || []);
+  }, [projectId, projectFiles]);
+
+  useEffect(() => {
     if (!actionMode) return;
     if (actionMode === 'file-edit' && projectFilesList.length > 0) {
       setEditFileId(projectFilesList[0].id);
@@ -225,7 +229,7 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
         ) : null}
 
         {isProjectLead && !isProjectSubmitted && actionMode === 'submit-final' ? (
-          <section className="final-submission" style={{ marginBottom: '16px' }}>
+          <section className="final-submission" style={{ marginBlockEnd: '16px' }}>
             <div className="submission-info">
               <h4>Submission Actions</h4>
               <p>Use quick actions to complete your submission flow.</p>
@@ -355,7 +359,7 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
       </section>
 
       {isProjectLead && editFileId && actionMode === 'file-edit' ? (
-        <section className="final-submission" style={{ marginTop: '12px' }}>
+        <section className="final-submission" style={{ marginBlockStart: '12px' }}>
           <div className="submission-info">
             <h4>Edit File Details</h4>
             <p>Update description/version notes for the selected file.</p>
@@ -367,7 +371,7 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
             onChange={(event) => setEditDescription(event.target.value)}
             placeholder="Update file notes"
           />
-          <div className="button-group" style={{ marginTop: '10px' }}>
+          <div className="button-group" style={{ marginBlockStart: '10px' }}>
             <button type="button" className="btn-primary" onClick={handleSaveEditFile}>Save File Edit</button>
             <button
               type="button"

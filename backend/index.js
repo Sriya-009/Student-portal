@@ -329,6 +329,50 @@ function toSafeProject(project) {
   };
 }
 
+function toSafeProjectTask(task) {
+  return {
+    id: task.id,
+    projectId: task.project_id,
+    title: task.title || '',
+    description: task.description || '',
+    assignedToId: task.assigned_to_id || '',
+    assignedToName: task.assigned_to_name || '',
+    status: task.status || 'pending',
+    deadline: task.deadline || null,
+    contributionPercent: Number(task.contribution_percent || 0)
+  };
+}
+
+function toSafeProjectFile(file) {
+  return {
+    id: file.id,
+    projectId: file.project_id,
+    fileName: file.file_name || '',
+    fileSize: Number(file.file_size || 0),
+    fileType: file.file_type || 'other',
+    mimeType: file.mime_type || '',
+    uploadedBy: file.uploaded_by || '',
+    uploadedByName: file.uploaded_by_name || '',
+    uploadedDate: file.uploaded_date || null,
+    version: Number(file.version || 1),
+    description: file.description || '',
+    downloadCount: Number(file.download_count || 0),
+    isSubmitted: Boolean(file.is_submitted),
+    submittedDate: file.submitted_date || null,
+    updatedDate: file.updated_date || null
+  };
+}
+
+function toSafeFeedbackCorrection(correction) {
+  return {
+    id: correction.id,
+    projectId: correction.project_id,
+    studentIdentifier: correction.student_identifier,
+    note: correction.note || '',
+    createdAt: correction.created_at
+  };
+}
+
 function normalizeDateOrNull(value) {
   if (value === null || value === undefined) {
     return null;
@@ -362,6 +406,61 @@ async function ensureProjectsTable() {
       owner_identifier VARCHAR(50) NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+}
+
+async function ensureProjectWorkspaceTables() {
+  const pool = getPool();
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_tasks (
+      id VARCHAR(80) PRIMARY KEY,
+      project_id VARCHAR(60) NOT NULL,
+      title VARCHAR(220) NOT NULL,
+      description TEXT NULL,
+      assigned_to_id VARCHAR(80) NULL,
+      assigned_to_name VARCHAR(180) NULL,
+      status VARCHAR(40) NOT NULL DEFAULT 'pending',
+      deadline DATE NULL,
+      contribution_percent INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_project_tasks_project (project_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_files (
+      id VARCHAR(80) PRIMARY KEY,
+      project_id VARCHAR(60) NOT NULL,
+      file_name VARCHAR(260) NOT NULL,
+      file_size BIGINT NOT NULL DEFAULT 0,
+      file_type VARCHAR(60) NULL,
+      mime_type VARCHAR(120) NULL,
+      uploaded_by VARCHAR(80) NULL,
+      uploaded_by_name VARCHAR(180) NULL,
+      uploaded_date DATE NULL,
+      version INT NOT NULL DEFAULT 1,
+      description TEXT NULL,
+      download_count INT NOT NULL DEFAULT 0,
+      is_submitted TINYINT(1) NOT NULL DEFAULT 0,
+      submitted_date DATE NULL,
+      updated_date DATE NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_project_files_project (project_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_feedback_corrections (
+      id VARCHAR(80) PRIMARY KEY,
+      project_id VARCHAR(60) NOT NULL,
+      student_identifier VARCHAR(80) NULL,
+      note TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_project_feedback_project (project_id)
     )
   `);
 }
@@ -551,6 +650,91 @@ async function ensureDefaultAdmin() {
   }
 }
 
+async function ensureTempWorkspaceSeed() {
+  const pool = getPool();
+  const tempStudentIdentifier = 'TEMPSTU001';
+  const tempFacultyIdentifier = 'TEMPFAC001';
+  const tempProjectId = 'TEMP-PRJ-001';
+
+  const ensureUser = async ({ identifier, name, email, role, department, password }) => {
+    let existing = await findUserByIdentifierOrEmail(pool, identifier);
+    if (existing) {
+      return existing;
+    }
+
+    const passwordHash = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+    await pool.query(
+      `INSERT INTO users
+       (identifier, name, email, role, department, phone, is_active, must_reset_password, password)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        identifier,
+        name,
+        email,
+        role,
+        department,
+        '+91 90000 00000',
+        1,
+        0,
+        passwordHash
+      ]
+    );
+
+    existing = await findUserByIdentifierOrEmail(pool, identifier);
+    if (existing) {
+      await syncUserIntoRoleTables(pool, existing);
+    }
+    return existing;
+  };
+
+  const tempStudent = await ensureUser({
+    identifier: tempStudentIdentifier,
+    name: 'Temp Student',
+    email: 'temp.student@portal.local',
+    role: 'student',
+    department: 'Computer Science',
+    password: 'student123'
+  });
+
+  const tempFaculty = await ensureUser({
+    identifier: tempFacultyIdentifier,
+    name: 'Temp Faculty',
+    email: 'temp.faculty@portal.local',
+    role: 'faculty',
+    department: 'Computer Science',
+    password: 'faculty123'
+  });
+
+  if (tempStudent && tempFaculty) {
+    await pool.query(
+      'UPDATE users SET assigned_faculty_identifier = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [tempFaculty.identifier, tempStudent.id]
+    );
+  }
+
+  const [projectRows] = await pool.query('SELECT id FROM projects WHERE id = ? LIMIT 1', [tempProjectId]);
+  if (projectRows.length === 0 && tempStudent) {
+    const deadline = new Date();
+    deadline.setDate(deadline.getDate() + 14);
+    const deadlineIso = deadline.toISOString().slice(0, 10);
+
+    await pool.query(
+      `INSERT INTO projects (id, name, description, department, status, progress_percent, deadline, owner_identifier)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        tempProjectId,
+        'Temporary Full Workflow Project',
+        'Seeded demo project for validating student, faculty, and admin operations.',
+        tempStudent.department || 'Computer Science',
+        'ongoing',
+        45,
+        deadlineIso,
+        tempStudent.identifier
+      ]
+    );
+  }
+}
+
 async function generateIdentifierForRole(pool, role) {
   const prefixMap = {
     student: 'STU',
@@ -696,6 +880,204 @@ app.delete('/api/projects/:projectId', async (req, res) => {
 
     await pool.query('DELETE FROM projects WHERE id = ?', [projectId]);
     return res.json({ ok: true, deletedProjectId: projectId });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get('/api/projects/:projectId/tasks', async (req, res) => {
+  const projectId = String(req.params.projectId || '').trim();
+  if (!projectId) {
+    return res.status(400).json({ ok: false, error: 'projectId is required' });
+  }
+
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query(
+      'SELECT * FROM project_tasks WHERE project_id = ? ORDER BY created_at ASC',
+      [projectId]
+    );
+    return res.json({ ok: true, tasks: rows.map(toSafeProjectTask) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.put('/api/projects/:projectId/tasks', async (req, res) => {
+  const projectId = String(req.params.projectId || '').trim();
+  const tasks = Array.isArray(req.body?.tasks) ? req.body.tasks : null;
+
+  if (!projectId) {
+    return res.status(400).json({ ok: false, error: 'projectId is required' });
+  }
+
+  if (!tasks) {
+    return res.status(400).json({ ok: false, error: 'tasks array is required' });
+  }
+
+  try {
+    const pool = getPool();
+    await pool.query('DELETE FROM project_tasks WHERE project_id = ?', [projectId]);
+
+    for (const task of tasks) {
+      const taskId = String(task?.id || `TSK-${Date.now()}-${Math.floor(Math.random() * 1000)}`).trim();
+      const title = String(task?.title || '').trim();
+      if (!title) {
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+
+      await pool.query(
+        `INSERT INTO project_tasks
+         (id, project_id, title, description, assigned_to_id, assigned_to_name, status, deadline, contribution_percent)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          taskId,
+          projectId,
+          title,
+          String(task?.description || '').trim() || null,
+          String(task?.assignedToId || '').trim() || null,
+          String(task?.assignedToName || '').trim() || null,
+          String(task?.status || 'pending').trim() || 'pending',
+          normalizeDateOrNull(task?.deadline),
+          Math.min(100, Math.max(0, Number(task?.contributionPercent || 0)))
+        ]
+      );
+    }
+
+    const [rows] = await pool.query(
+      'SELECT * FROM project_tasks WHERE project_id = ? ORDER BY created_at ASC',
+      [projectId]
+    );
+    return res.json({ ok: true, tasks: rows.map(toSafeProjectTask) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get('/api/projects/:projectId/files', async (req, res) => {
+  const projectId = String(req.params.projectId || '').trim();
+  if (!projectId) {
+    return res.status(400).json({ ok: false, error: 'projectId is required' });
+  }
+
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query(
+      'SELECT * FROM project_files WHERE project_id = ? ORDER BY created_at ASC',
+      [projectId]
+    );
+    return res.json({ ok: true, files: rows.map(toSafeProjectFile) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.put('/api/projects/:projectId/files', async (req, res) => {
+  const projectId = String(req.params.projectId || '').trim();
+  const files = Array.isArray(req.body?.files) ? req.body.files : null;
+
+  if (!projectId) {
+    return res.status(400).json({ ok: false, error: 'projectId is required' });
+  }
+
+  if (!files) {
+    return res.status(400).json({ ok: false, error: 'files array is required' });
+  }
+
+  try {
+    const pool = getPool();
+    await pool.query('DELETE FROM project_files WHERE project_id = ?', [projectId]);
+
+    for (const file of files) {
+      const fileId = String(file?.id || `FILE-${Date.now()}-${Math.floor(Math.random() * 1000)}`).trim();
+      const fileName = String(file?.fileName || '').trim();
+      if (!fileName) {
+        // eslint-disable-next-line no-continue
+        continue;
+      }
+
+      await pool.query(
+        `INSERT INTO project_files
+         (id, project_id, file_name, file_size, file_type, mime_type, uploaded_by, uploaded_by_name, uploaded_date, version, description, download_count, is_submitted, submitted_date, updated_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          fileId,
+          projectId,
+          fileName,
+          Number(file?.fileSize || 0),
+          String(file?.fileType || 'other').trim() || 'other',
+          String(file?.mimeType || '').trim() || null,
+          String(file?.uploadedBy || '').trim() || null,
+          String(file?.uploadedByName || '').trim() || null,
+          normalizeDateOrNull(file?.uploadedDate),
+          Math.max(1, Number(file?.version || 1)),
+          String(file?.description || '').trim() || null,
+          Math.max(0, Number(file?.downloadCount || 0)),
+          file?.isSubmitted ? 1 : 0,
+          normalizeDateOrNull(file?.submittedDate),
+          normalizeDateOrNull(file?.updatedDate)
+        ]
+      );
+    }
+
+    const [rows] = await pool.query(
+      'SELECT * FROM project_files WHERE project_id = ? ORDER BY created_at ASC',
+      [projectId]
+    );
+    return res.json({ ok: true, files: rows.map(toSafeProjectFile) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get('/api/projects/:projectId/feedback-corrections', async (req, res) => {
+  const projectId = String(req.params.projectId || '').trim();
+  if (!projectId) {
+    return res.status(400).json({ ok: false, error: 'projectId is required' });
+  }
+
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query(
+      'SELECT * FROM project_feedback_corrections WHERE project_id = ? ORDER BY created_at DESC',
+      [projectId]
+    );
+    return res.json({ ok: true, corrections: rows.map(toSafeFeedbackCorrection) });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post('/api/projects/:projectId/feedback-corrections', async (req, res) => {
+  const projectId = String(req.params.projectId || '').trim();
+  const studentIdentifier = String(req.body?.studentIdentifier || '').trim();
+  const note = String(req.body?.note || '').trim();
+
+  if (!projectId) {
+    return res.status(400).json({ ok: false, error: 'projectId is required' });
+  }
+
+  if (!note) {
+    return res.status(400).json({ ok: false, error: 'note is required' });
+  }
+
+  try {
+    const pool = getPool();
+    const correctionId = `CORR-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    await pool.query(
+      `INSERT INTO project_feedback_corrections (id, project_id, student_identifier, note)
+       VALUES (?, ?, ?, ?)`,
+      [correctionId, projectId, studentIdentifier || null, note]
+    );
+
+    const [rows] = await pool.query(
+      'SELECT * FROM project_feedback_corrections WHERE id = ? LIMIT 1',
+      [correctionId]
+    );
+
+    return res.status(201).json({ ok: true, correction: toSafeFeedbackCorrection(rows[0]) });
   } catch (error) {
     return res.status(500).json({ ok: false, error: error.message });
   }
@@ -1269,17 +1651,15 @@ app.listen(PORT, () => {
   console.log(`API server running on http://localhost:${PORT}`);
 });
 
-ensureDefaultAdmin().catch((error) => {
-  // eslint-disable-next-line no-console
-  console.error(`Failed to ensure default admin: ${error.message}`);
-});
+async function bootstrapData() {
+  await ensureProjectsTable();
+  await ensureProjectWorkspaceTables();
+  await ensureStudentFacultyAssignmentColumn();
+  await ensureDefaultAdmin();
+  await ensureTempWorkspaceSeed();
+}
 
-ensureProjectsTable().catch((error) => {
+bootstrapData().catch((error) => {
   // eslint-disable-next-line no-console
-  console.error(`Failed to ensure projects table: ${error.message}`);
-});
-
-ensureStudentFacultyAssignmentColumn().catch((error) => {
-  // eslint-disable-next-line no-console
-  console.error(`Failed to ensure student-faculty assignment column: ${error.message}`);
+  console.error(`Failed during bootstrap: ${error.message}`);
 });

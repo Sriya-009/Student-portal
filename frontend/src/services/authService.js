@@ -293,3 +293,60 @@ export async function getStudentFacultyAssignments() {
   const payload = await parseResponse(response);
   return payload.assignments || [];
 }
+
+export async function getProjectTasks(projectId) {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/tasks`);
+  const payload = await parseResponse(response);
+  return payload.tasks || [];
+}
+
+export async function saveProjectTasks(projectId, tasks) {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/tasks`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ tasks })
+  });
+
+  const payload = await parseResponse(response);
+  return payload.tasks || [];
+}
+
+export async function getProjectFiles(projectId) {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/files`);
+  const payload = await parseResponse(response);
+  return payload.files || [];
+}
+
+export async function saveProjectFiles(projectId, files) {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/files`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ files })
+  });
+
+  const payload = await parseResponse(response);
+  return payload.files || [];
+}
+
+export async function getProjectFeedbackCorrections(projectId) {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/feedback-corrections`);
+  const payload = await parseResponse(response);
+  return payload.corrections || [];
+}
+
+export async function addProjectFeedbackCorrection(projectId, studentIdentifier, note) {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/feedback-corrections`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ studentIdentifier, note })
+  });
+
+  const payload = await parseResponse(response);
+  return payload.correction;
+}

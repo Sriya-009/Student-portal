@@ -44,6 +44,27 @@ function AdminDashboard() {
     [allUsers]
   );
 
+  const submissionEvents = useMemo(() => (
+    allProjects
+      .filter((project) => project.deadline)
+      .map((project) => ({
+        id: `EVT-${project.id}`,
+        projectId: project.id,
+        title: `${project.name} submission deadline`,
+        dueDate: project.deadline
+      }))
+  ), [allProjects]);
+
+  const projectFiles = useMemo(() => (
+    allProjects.map((project, index) => ({
+      id: `A-FILE-${project.id}`,
+      projectId: project.id,
+      fileName: `${String(project.name || 'project').replace(/\s+/g, '-').toLowerCase()}-artifact-${index + 1}.pdf`,
+      isSubmitted: String(project.status || '').toLowerCase() === 'completed',
+      uploadedDate: project.deadline || new Date().toISOString().slice(0, 10)
+    }))
+  ), [allProjects]);
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -99,8 +120,8 @@ function AdminDashboard() {
             students={students}
             mentors={mentors}
             projects={allProjects}
-            files={[]}
-            submissionEvents={[]}
+            files={projectFiles}
+            submissionEvents={submissionEvents}
             activeSection={activeSection}
             activeAction={activeAction}
           />

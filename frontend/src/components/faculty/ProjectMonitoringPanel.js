@@ -206,7 +206,7 @@ function ProjectMonitoringPanel({ projects, tasks = [], activeAction }) {
                     <div className="progress-bar">
                       <div
                         className="progress-fill"
-                        style={{ width: `${project.progressPercent}%` }}
+                        style={{ inlineSize: `${project.progressPercent}%` }}
                       />
                     </div>
                     <p className="progress-text">{project.progressPercent}% Complete</p>
@@ -268,7 +268,7 @@ function ProjectMonitoringPanel({ projects, tasks = [], activeAction }) {
 
             <div className="monitor-popup-progress">
               <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${popupProject.progressPercent}%` }} />
+                <div className="progress-fill" style={{ inlineSize: `${popupProject.progressPercent}%` }} />
               </div>
               <p>{popupProject.progressPercent}% completed</p>
             </div>

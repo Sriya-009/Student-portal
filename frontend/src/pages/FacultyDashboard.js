@@ -111,6 +111,140 @@ function FacultyDashboard() {
     };
   }, [user]);
 
+  const normalizedProjects = useMemo(() => (
+    (registeredProjects || []).map((project) => ({
+      ...project,
+      teamMembers: Array.isArray(project.teamMembers) && project.teamMembers.length > 0
+        ? project.teamMembers
+        : [{
+            id: project.ownerIdentifier || 'NA',
+            name: project.ownerIdentifier || 'Student Lead',
+            role: 'Lead'
+          }],
+      teamMemberIds: Array.isArray(project.teamMemberIds) && project.teamMemberIds.length > 0
+        ? project.teamMemberIds
+        : [project.ownerIdentifier || 'NA'],
+      technologies: Array.isArray(project.technologies) ? project.technologies : ['React', 'Node.js']
+    }))
+  ), [registeredProjects]);
+
+  const workspaceProposals = useMemo(() => (
+    normalizedProjects.map((project) => ({
+      id: `PROP-${project.id}`,
+      title: project.name,
+      description: project.description || 'No proposal description provided.',
+      suggestedBy: project.ownerIdentifier || 'Student',
+      submittedDate: project.deadline || new Date().toISOString().slice(0, 10),
+      status: project.status === 'completed' ? 'approved' : 'pending',
+      assignedMentor: currentFaculty.id,
+      feedbackFromFaculty: project.status === 'completed' ? 'Reviewed and completed.' : ''
+    }))
+  ), [normalizedProjects, currentFaculty.id]);
+
+  const workspaceTasks = useMemo(() => {
+    const primaryStudent = registeredStudents[0]?.rollNumber || normalizedProjects[0]?.ownerIdentifier || 'TEMPSTU001';
+    const primaryStudentName = registeredStudents[0]?.name || 'Temp Student';
+    const baseProject = normalizedProjects[0];
+
+    if (!baseProject) {
+      return [];
+    }
+
+    return [
+      {
+        id: `TSK-${baseProject.id}-001`,
+        projectId: baseProject.id,
+        title: 'Design module architecture',
+        description: 'Prepare architecture, API contracts, and workflow diagram.',
+        assignedToId: primaryStudent,
+        assignedToName: primaryStudentName,
+        status: 'in_progress',
+        deadline: baseProject.deadline || new Date().toISOString().slice(0, 10),
+        contributionPercent: 55
+      },
+      {
+        id: `TSK-${baseProject.id}-002`,
+        projectId: baseProject.id,
+        title: 'Implement backend integration',
+        description: 'Integrate project API and validation logic.',
+        assignedToId: primaryStudent,
+        assignedToName: primaryStudentName,
+        status: 'pending',
+        deadline: baseProject.deadline || new Date().toISOString().slice(0, 10),
+        contributionPercent: 20
+      }
+    ];
+  }, [normalizedProjects, registeredStudents]);
+
+  const workspaceFiles = useMemo(() => {
+    const baseProject = normalizedProjects[0];
+    if (!baseProject) {
+      return [];
+    }
+
+    return [
+      {
+        id: `FILE-${baseProject.id}-001`,
+        projectId: baseProject.id,
+        fileName: 'project-report-v1.pdf',
+        uploadedDate: new Date().toISOString().slice(0, 10),
+        version: 1,
+        description: 'Initial project report for faculty review.',
+        isSubmitted: false
+      },
+      {
+        id: `FILE-${baseProject.id}-002`,
+        projectId: baseProject.id,
+        fileName: 'implementation-summary.docx',
+        uploadedDate: new Date().toISOString().slice(0, 10),
+        version: 2,
+        description: 'Implementation milestone summary.',
+        isSubmitted: true
+      }
+    ];
+  }, [normalizedProjects]);
+
+  const workspaceGrades = useMemo(() => {
+    const baseProject = normalizedProjects[0];
+    const primaryStudent = registeredStudents[0]?.rollNumber || baseProject?.ownerIdentifier || 'TEMPSTU001';
+
+    if (!baseProject) {
+      return [];
+    }
+
+    const proposalMark = 14;
+    const progressMark = 15;
+    const implementationMark = 22;
+    const finalSubmissionMark = 18;
+    const totalMark = proposalMark + progressMark + implementationMark + finalSubmissionMark;
+
+    return [
+      {
+        id: `GRD-${baseProject.id}-001`,
+        projectId: baseProject.id,
+        studentId: primaryStudent,
+        proposalMark,
+        progressMark,
+        implementationMark,
+        finalSubmissionMark,
+        totalMark,
+        maxMark: 100,
+        comments: 'Good progress. Focus on final report quality.',
+        status: 'in-progress',
+        evaluationDate: new Date().toISOString().slice(0, 10),
+        feedbackList: []
+      }
+    ];
+  }, [normalizedProjects, registeredStudents]);
+
+  const studentMap = useMemo(() => {
+    const map = {};
+    registeredStudents.forEach((student) => {
+      map[student.rollNumber] = student.name;
+    });
+    return map;
+  }, [registeredStudents]);
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -121,38 +255,34 @@ function FacultyDashboard() {
       case 'approval':
         return (
           <ProjectApprovalPanel
-            proposals={[]}
+            proposals={workspaceProposals}
             mentors={registeredFaculty}
-            projects={registeredProjects}
+            projects={normalizedProjects}
             students={registeredStudents}
             activeAction={activeAction}
           />
         );
       case 'monitoring':
-        return <ProjectMonitoringPanel projects={registeredProjects} tasks={[]} activeAction={activeAction} />;
+        return <ProjectMonitoringPanel projects={normalizedProjects} tasks={workspaceTasks} activeAction={activeAction} />;
       case 'tasks':
-        return <TaskOversightPanel tasks={[]} studentsMap={getStudentMap()} activeAction={activeAction} />;
+        return <TaskOversightPanel tasks={workspaceTasks} studentsMap={studentMap} activeAction={activeAction} />;
       case 'files':
-        return <FileReviewPanel files={[]} projects={registeredProjects} activeAction={activeAction} />;
+        return <FileReviewPanel files={workspaceFiles} projects={normalizedProjects} activeAction={activeAction} />;
       case 'student-search':
         return <StudentSearchPanel students={registeredStudents} activeAction={activeAction} error={studentSearchError} />;
       case 'communication':
         return <CommunicationPanel facultyId={currentFaculty.id} activeAction={activeAction} />;
       case 'feedback':
-        return <FeedbackEvaluationPanel grades={[]} facultyId={currentFaculty.id} activeAction={activeAction} />;
+        return <FeedbackEvaluationPanel grades={workspaceGrades} facultyId={currentFaculty.id} activeAction={activeAction} />;
       case 'grading':
-        return <GradingPanel grades={[]} projects={registeredProjects} />;
+        return <GradingPanel grades={workspaceGrades} projects={normalizedProjects} />;
       case 'reports':
-        return <ReportsAnalyticsPanel projects={registeredProjects} grades={[]} activeAction={activeAction} />;
+        return <ReportsAnalyticsPanel projects={normalizedProjects} grades={workspaceGrades} activeAction={activeAction} />;
       case 'final-actions':
-        return <FinalActionsPanel projects={registeredProjects} activeAction={activeAction} />;
+        return <FinalActionsPanel projects={normalizedProjects} grades={workspaceGrades} activeAction={activeAction} />;
       default:
-        return <ProjectApprovalPanel proposals={[]} mentors={registeredFaculty} projects={registeredProjects} students={registeredStudents} />;
+        return <ProjectApprovalPanel proposals={workspaceProposals} mentors={registeredFaculty} projects={normalizedProjects} students={registeredStudents} />;
     }
-  };
-
-  const getStudentMap = () => {
-    return {};
   };
 
   return (
