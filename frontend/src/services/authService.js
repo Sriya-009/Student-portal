@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://54.144.255.74:5000';
+import { BASE_URL as API_BASE_URL } from '../config/api';
 
 function toNetworkError(error) {
   if (error instanceof TypeError) {

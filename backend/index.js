@@ -1646,9 +1646,9 @@ app.delete('/api/profile-photo/:identifier', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+app.listen(process.env.PORT || 5000, "0.0.0.0", () => {
   // eslint-disable-next-line no-console
-  console.log(`API server running on http://localhost:${PORT}`);
+  console.log(`Server running on port ${process.env.PORT || 5000}`);
 });
 
 async function bootstrapData() {
