@@ -782,6 +782,10 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+app.get('/', (_req, res) => {
+  res.status(200).send('Student Portal API is running. Use /api/health for status.');
+});
+
 app.get('/api/users', async (_req, res) => {
   try {
     const pool = getPool();
