@@ -12,7 +12,7 @@ const rateLimit = require('express-rate-limit');
 const { getPool, testConnection } = require('./db');
 
 const app = express();
-const PORT = Number(process.env.SERVER_PORT || 5000);
+const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || process.env.REACT_APP_JWT_SECRET || 'portal-dev-secret-key';
 const JWT_EXPIRES_IN = '1h';
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);

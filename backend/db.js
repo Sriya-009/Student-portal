@@ -11,7 +11,10 @@ function getConfig() {
     password: process.env.DB_PASSWORD || '',
     waitForConnections: true,
     connectionLimit: Number(process.env.DB_CONNECTION_LIMIT || 10),
-    queueLimit: 0
+    queueLimit: 0,
+    ssl: {
+      rejectUnauthorized: false
+    }
   };
 
   if (schemaName) {
