@@ -73,7 +73,7 @@ async function requestChatCompletion(message, history = []) {
       temperature: 0.2,
       max_tokens: 400
     }),
-    signal: AbortSignal.timeout(10000)
+    signal: AbortSignal.timeout(30000)
   });
 
   if (!response.ok) {
