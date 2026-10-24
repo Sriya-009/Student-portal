@@ -35,12 +35,20 @@ async function ensureUsersTable() {
       two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0,
       is_active TINYINT(1) NOT NULL DEFAULT 1,
       must_reset_password TINYINT(1) NOT NULL DEFAULT 0,
+      assigned_faculty_identifier VARCHAR(50) NULL,
       photo_url VARCHAR(255) NULL,
       password VARCHAR(255) NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+
+  const [columns] = await pool.query("SHOW COLUMNS FROM users LIKE 'assigned_faculty_identifier'");
+  if (columns.length === 0) {
+    await pool.query(
+      'ALTER TABLE users ADD COLUMN assigned_faculty_identifier VARCHAR(50) NULL'
+    );
+  }
 
   const [tables] = await pool.query('SHOW TABLES');
   console.log('users table ensured. Current tables:', tables);

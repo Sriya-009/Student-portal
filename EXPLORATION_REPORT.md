@@ -57,8 +57,8 @@ This React-based student portal implements a role-based project management syste
 **Students:**
 ```javascript
 studentCredentials: [
-  { rollNumber: 'STU001', password: 'student123' },
-  { rollNumber: 'STU002', password: 'student123' },
+  { rollNumber: 'STU001', password: '<configured student password>' },
+  { rollNumber: 'STU002', password: '<configured student password>' },
   // ... more students
 ]
 ```
@@ -66,8 +66,8 @@ studentCredentials: [
 **Faculty:**
 ```javascript
 facultyCredentials: [
-  { facultyId: 'MENTOR-001', password: 'faculty123' },
-  { facultyId: 'MENTOR-002', password: 'faculty123' },
+  { facultyId: 'MENTOR-001', password: '<configured faculty password>' },
+  { facultyId: 'MENTOR-002', password: '<configured faculty password>' },
   // ... more faculty
 ]
 ```
@@ -75,10 +75,10 @@ facultyCredentials: [
 **Admin/Staff:**
 ```javascript
 users: [
-  { id: 1, name: 'Admin User', email: 'admin', password: 'admin123', 
+  { id: 1, name: 'Admin User', email: 'admin', password: '<configured admin password>',
     role: 'admin', phone: '+91 98765 12345' },
-  { id: 2, name: 'Faculty User', email: 'faculty@school.com', 
-    password: 'faculty123', role: 'faculty', phone: '+91 91234 56789' }
+  { id: 2, name: 'Faculty User', email: 'faculty@school.com',
+    password: '<configured faculty password>', role: 'faculty', phone: '+91 91234 56789' }
 ]
 ```
 
@@ -441,15 +441,15 @@ function canManageProject(actor, project) {
 
 ### Student Login:
 - **Roll Number:** STU001-STU004
-- **Password:** `student123`
+- **Password:** `<configured student password>`
 
 ### Faculty Login:
 - **Faculty ID:** MENTOR-001 to MENTOR-003
-- **Password:** `faculty123`
+- **Password:** `<configured faculty password>`
 
 ### Admin/Staff Login:
 - **Email:** `admin` or `faculty@school.com`
-- **Password:** `admin123` or `faculty123`
+- **Password:** `<configured admin password>` or `<configured faculty password>`
 - **Requires OTP:** Yes (demo OTP shown on login page)
 - **Demo Phone:** `+91 98765 12345` (masked as `*** *** 2345`)
 

@@ -7,19 +7,25 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { getPool, testConnection } = require('./db');
+const { requestChatCompletion } = require('./chatService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || process.env.REACT_APP_JWT_SECRET || 'portal-dev-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '1h';
 const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
-const DEFAULT_ADMIN_IDENTIFIER = process.env.DEFAULT_ADMIN_IDENTIFIER || 'admin1';
-const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || 'admin009';
+const DEFAULT_ADMIN_IDENTIFIER = process.env.DEFAULT_ADMIN_IDENTIFIER || '';
+const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || '';
+const OTP_SESSION_TTL_MS = 5 * 60 * 1000;
+const MAX_OTP_ATTEMPTS = 5;
 const otpSessions = new Map();
 const lastIssuedOtpByUser = new Map();
+const passwordResetTokens = new Map();
+const PHOTO_URL_TTL_SECONDS = 5 * 60;
 const USER_SELECT_FIELDS = [
   'id',
   'identifier',
@@ -103,6 +109,22 @@ const apiRateLimiter = rateLimit({
   legacyHeaders: false
 });
 
+const sensitiveAuthRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: 'Too many authentication requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+const chatRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: 'Too many chat requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 // ========== FILE UPLOAD CONFIG ==========
 const uploadsDir = path.join(__dirname, 'uploads', 'profile-photos');
 if (!fs.existsSync(uploadsDir)) {
@@ -114,7 +136,7 @@ const storage = multer.diskStorage({
     cb(null, uploadsDir);
   },
   filename: (_req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
+    const uniqueName = `${Date.now()}-${crypto.randomBytes(12).toString('hex')}${path.extname(file.originalname).toLowerCase()}`;
     cb(null, uniqueName);
   }
 });
@@ -134,10 +156,108 @@ const uploadMiddleware = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
-app.use(cors());
+function safeUnlink(filePath) {
+  if (!filePath) {
+    return;
+  }
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.error(`Failed to remove file ${path.basename(filePath)}:`, error.message);
+  }
+}
+
+function hasValidImageSignature(filePath) {
+  const header = fs.readFileSync(filePath).subarray(0, 12);
+  const isJpeg = header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+  const isPng = header.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const isGif = header.subarray(0, 6).toString('ascii') === 'GIF87a'
+    || header.subarray(0, 6).toString('ascii') === 'GIF89a';
+  const isWebp = header.subarray(0, 4).toString('ascii') === 'RIFF'
+    && header.subarray(8, 12).toString('ascii') === 'WEBP';
+  return isJpeg || isPng || isGif || isWebp;
+}
+
+function createPhotoUrl(photoPath) {
+  if (!JWT_SECRET) {
+    return null;
+  }
+  const filename = path.basename(String(photoPath || ''));
+  if (!filename) {
+    return null;
+  }
+  const expires = Math.floor(Date.now() / 1000) + PHOTO_URL_TTL_SECONDS;
+  const signature = crypto
+    .createHmac('sha256', JWT_SECRET)
+    .update(`${filename}:${expires}`)
+    .digest('hex');
+  return `/uploads/profile-photos/${encodeURIComponent(filename)}?expires=${expires}&signature=${signature}`;
+}
+
+function isValidPhotoSignature(filename, expires, signature) {
+  if (!JWT_SECRET) {
+    return false;
+  }
+  const expiresAt = Number(expires);
+  if (!Number.isInteger(expiresAt) || expiresAt < Math.floor(Date.now() / 1000)) {
+    return false;
+  }
+  const expected = crypto
+    .createHmac('sha256', JWT_SECRET)
+    .update(`${filename}:${expiresAt}`)
+    .digest('hex');
+  return typeof signature === 'string'
+    && signature.length === expected.length
+    && crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+}
+
+const allowedOrigins = String(process.env.CORS_ORIGINS || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: false
+}));
 app.use(express.json());
 app.use(apiRateLimiter);
-app.use('/uploads/profile-photos', express.static(uploadsDir));
+app.get('/uploads/profile-photos/:filename', (req, res) => {
+  const filename = path.basename(req.params.filename);
+  if (!isValidPhotoSignature(filename, req.query.expires, req.query.signature)) {
+    return res.status(401).json({ ok: false, error: 'Invalid or expired photo URL.' });
+  }
+  return res.sendFile(path.join(uploadsDir, filename));
+});
+app.use('/api', authenticateRequest);
+
+app.post('/api/chat', requireRoles('student', 'faculty', 'admin'), chatRateLimiter, async (req, res) => {
+  const { message, history } = req.body || {};
+  if (typeof message !== 'string' || !message.trim() || message.length > 2000) {
+    return res.status(400).json({ ok: false, error: 'message must be a non-empty string under 2000 characters.' });
+  }
+  if (history !== undefined && !Array.isArray(history)) {
+    return res.status(400).json({ ok: false, error: 'history must be an array.' });
+  }
+  if (JSON.stringify({ message, history }).length > 32000) {
+    return res.status(413).json({ ok: false, error: 'Chat request is too large.' });
+  }
+
+  try {
+    const response = await requestChatCompletion(message.trim(), history);
+    return res.json({ ok: true, message: response });
+  } catch (error) {
+    if (error.code === 'INVALID_CHAT_HISTORY') {
+      return res.status(400).json({ ok: false, error: 'history contains invalid messages.' });
+    }
+    if (error.code === 'AI_NOT_CONFIGURED') {
+      return res.status(503).json({ ok: false, error: 'The assistant is not configured yet.' });
+    }
+    console.error('Chat provider request failed:', error.message);
+    return res.status(502).json({ ok: false, error: 'The assistant is temporarily unavailable.' });
+  }
+});
 
 function maskPhone(phoneNumber) {
   const digits = (phoneNumber || '').replace(/\D/g, '');
@@ -148,7 +268,7 @@ function maskPhone(phoneNumber) {
 }
 
 function generateOtpCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(crypto.randomInt(100000, 1000000));
 }
 
 function issueUniqueOtp(userKey, previousOtp = '') {
@@ -219,15 +339,88 @@ async function verifyPasswordAndMigrate(pool, user, plainPassword) {
     return bcrypt.compare(String(plainPassword), storedPassword);
   }
 
-  const isLegacyMatch = storedPassword === String(plainPassword);
-  if (!isLegacyMatch) {
+  // Legacy plaintext credentials must not be accepted or retained.
+  const unusableHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), BCRYPT_SALT_ROUNDS);
+  await pool.query(
+    'UPDATE users SET password = ?, must_reset_password = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [unusableHash, user.id]
+  );
+  user.password = unusableHash;
+  user.must_reset_password = 1;
+  await syncUserIntoRoleTables(pool, user);
+  return false;
+}
+
+async function deliverWebhookMessage({ url, apiKey, event, recipient, code, expiresAt }) {
+  let providerUrl;
+  try {
+    providerUrl = new URL(String(url || ''));
+  } catch (_error) {
     return false;
   }
 
-  const upgradedHash = await bcrypt.hash(String(plainPassword), BCRYPT_SALT_ROUNDS);
-  await pool.query('UPDATE users SET password = ? WHERE id = ?', [upgradedHash, user.id]);
-  user.password = upgradedHash;
-  return true;
+  if (!['http:', 'https:'].includes(providerUrl.protocol)
+    || !String(apiKey || '').trim()
+    || !String(event || '').trim()
+    || !String(recipient || '').trim()
+    || !String(code || '').trim()
+    || !Number.isFinite(Number(expiresAt))) {
+    return false;
+  }
+
+  try {
+    const response = await fetch(providerUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({ event, recipient, code, expiresAt }),
+      signal: AbortSignal.timeout(10000)
+    });
+    return response.ok;
+  } catch (error) {
+    console.error(`Webhook delivery failed for ${event}:`, error.message);
+    return false;
+  }
+}
+
+async function deliverOtp(user, otpCode, expiresAt) {
+  if (String(process.env.OTP_DELIVERY || '').toLowerCase() !== 'webhook') {
+    return false;
+  }
+  return deliverWebhookMessage({
+    url: process.env.OTP_PROVIDER_URL,
+    apiKey: process.env.OTP_PROVIDER_API_KEY,
+    event: 'student-portal.otp',
+    recipient: user.phone || user.email,
+    code: otpCode,
+    expiresAt
+  });
+}
+
+async function deliverPasswordReset(user, resetToken, expiresAt) {
+  if (String(process.env.RESET_TOKEN_DELIVERY || '').toLowerCase() !== 'webhook') {
+    return false;
+  }
+  return deliverWebhookMessage({
+    url: process.env.RESET_PROVIDER_URL,
+    apiKey: process.env.RESET_PROVIDER_API_KEY,
+    event: 'student-portal.password-reset',
+    recipient: user.email,
+    code: resetToken,
+    expiresAt
+  });
+}
+
+function takePasswordResetToken(resetToken) {
+  const normalizedToken = String(resetToken || '').trim();
+  const tokenRecord = passwordResetTokens.get(normalizedToken);
+  passwordResetTokens.delete(normalizedToken);
+  if (!tokenRecord || Date.now() > tokenRecord.expiresAt) {
+    return null;
+  }
+  return tokenRecord;
 }
 
 async function findUserByIdentifierOrEmail(pool, identifier) {
@@ -257,6 +450,81 @@ function parseJsonArray(value) {
   } catch (_error) {
     return [];
   }
+}
+
+function sendServerError(res, error) {
+  console.error(error);
+  return res.status(500).json({ ok: false, error: 'An unexpected server error occurred.' });
+}
+
+function authenticateRequest(req, res, next) {
+  const publicPaths = new Set([
+    '/health',
+    '/auth/login',
+    '/auth/signup',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+    '/auth/verify-otp',
+    '/auth/resend-otp',
+    '/auth/verify-token'
+  ]);
+
+  if (publicPaths.has(req.path)) {
+    return next();
+  }
+
+  const authorization = String(req.get('authorization') || '');
+  const token = authorization.startsWith('Bearer ')
+    ? authorization.slice('Bearer '.length).trim()
+    : '';
+
+  if (!token) {
+    return res.status(401).json({ ok: false, error: 'Authentication required.' });
+  }
+
+  try {
+    const decoded = verifyAuthToken(token);
+    req.auth = decoded;
+    return next();
+  } catch (_error) {
+    return res.status(401).json({ ok: false, error: 'Invalid or expired token.' });
+  }
+}
+
+function requireRoles(...roles) {
+  return (req, res, next) => {
+    if (!req.auth || !roles.includes(String(req.auth.role || '').toLowerCase())) {
+      return res.status(403).json({ ok: false, error: 'You are not authorized to perform this action.' });
+    }
+    return next();
+  };
+}
+
+function isSelfOrAdmin(req, identifier) {
+  return String(req.auth?.role).toLowerCase() === 'admin'
+    || String(req.auth?.sub || '').toLowerCase() === String(identifier || '').toLowerCase();
+}
+
+async function canAccessProject(pool, req, projectId) {
+  if (String(req.auth?.role).toLowerCase() === 'admin') {
+    return true;
+  }
+
+  const [rows] = await pool.query(
+    `SELECT p.owner_identifier, s.assigned_faculty_identifier
+     FROM projects p
+     LEFT JOIN users s ON s.identifier = p.owner_identifier
+     WHERE p.id = ? LIMIT 1`,
+    [projectId]
+  );
+  const project = rows[0];
+  if (!project) {
+    return false;
+  }
+
+  const actor = String(req.auth?.sub || '').toLowerCase();
+  return String(project.owner_identifier || '').toLowerCase() === actor
+    || String(project.assigned_faculty_identifier || '').toLowerCase() === actor;
 }
 
 function toDbPatchValue(inputKey, value) {
@@ -308,7 +576,7 @@ function toSafeUser(user) {
     isActive: user.is_active === undefined ? true : Boolean(user.is_active),
     requiresPasswordReset: Boolean(user.must_reset_password),
     assignedFacultyIdentifier: user.assigned_faculty_identifier || null,
-    photoUrl: user.photo_url || null,
+    photoUrl: createPhotoUrl(user.photo_url),
     createdAt: user.created_at || null,
     updatedAt: user.updated_at || null
   };
@@ -473,12 +741,74 @@ async function ensureStudentFacultyAssignmentColumn() {
   }
 }
 
+async function ensureRoleTables() {
+    const pool = getPool();
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS student (
+        registration_no VARCHAR(80) PRIMARY KEY,
+        name VARCHAR(120) NOT NULL,
+        email VARCHAR(150) NOT NULL UNIQUE,
+        password VARCHAR(255) NULL,
+        course VARCHAR(120) NULL,
+        semester VARCHAR(20) NULL,
+        section VARCHAR(20) NULL,
+        batch_year VARCHAR(10) NULL,
+        date_of_birth DATE NULL,
+        guardian_name VARCHAR(120) NULL,
+        guardian_phone VARCHAR(30) NULL,
+        address VARCHAR(255) NULL,
+        profile_photo_url VARCHAR(255) NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        must_reset_password TINYINT(1) NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS faculty (
+        employee_id VARCHAR(80) PRIMARY KEY,
+        name VARCHAR(120) NOT NULL,
+        email VARCHAR(150) NOT NULL UNIQUE,
+        password VARCHAR(255) NULL,
+        department VARCHAR(120) NULL,
+        designation VARCHAR(120) NULL,
+        specialization VARCHAR(120) NULL,
+        qualification VARCHAR(160) NULL,
+        office_location VARCHAR(120) NULL,
+        office_hours VARCHAR(120) NULL,
+        joining_date DATE NULL,
+        bio TEXT NULL,
+        profile_photo_url VARCHAR(255) NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        must_reset_password TINYINT(1) NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS admin (
+        employee_id VARCHAR(80) PRIMARY KEY,
+        name VARCHAR(120) NOT NULL,
+        email VARCHAR(150) NOT NULL UNIQUE,
+        password VARCHAR(255) NULL,
+        role VARCHAR(20) NOT NULL DEFAULT 'admin',
+        access_level INT NOT NULL DEFAULT 1,
+        permissions_json JSON NULL,
+        two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0,
+        emergency_contact VARCHAR(30) NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        must_reset_password TINYINT(1) NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    await pool.query('UPDATE student SET password = NULL');
+    await pool.query('UPDATE faculty SET password = NULL');
+    await pool.query('UPDATE admin SET password = NULL');
+}
+
 async function syncUserIntoRoleTables(pool, user) {
   const normalizedRole = String(user?.role || '').trim().toLowerCase();
   const identifier = String(user?.identifier || '').trim();
   const email = String(user?.email || '').trim().toLowerCase();
   const name = String(user?.name || '').trim();
-  const password = String(user?.password || '').trim();
 
   if (!normalizedRole || !identifier || !email || !name) {
     return;
@@ -514,7 +844,7 @@ async function syncUserIntoRoleTables(pool, user) {
         identifier,
         name,
         email,
-        password || null,
+        null,
         user.department || null,
         user.semester || null,
         user.section || null,
@@ -556,7 +886,7 @@ async function syncUserIntoRoleTables(pool, user) {
         identifier,
         name,
         email,
-        password || null,
+        null,
         user.department || null,
         user.designation || null,
         user.specialization || null,
@@ -596,7 +926,7 @@ async function syncUserIntoRoleTables(pool, user) {
         identifier,
         name,
         email,
-        password || null,
+        null,
         'admin',
         normalizedAccessLevel,
         user.permissions_json || null,
@@ -613,7 +943,8 @@ async function ensureDefaultAdmin() {
   const pool = getPool();
   const normalizedIdentifier = String(DEFAULT_ADMIN_IDENTIFIER).trim().toLowerCase();
 
-  if (!normalizedIdentifier) {
+  if (!normalizedIdentifier || !DEFAULT_ADMIN_PASSWORD) {
+    console.warn('Default admin provisioning skipped; set DEFAULT_ADMIN_IDENTIFIER and DEFAULT_ADMIN_PASSWORD explicitly.');
     return;
   }
 
@@ -651,6 +982,13 @@ async function ensureDefaultAdmin() {
 }
 
 async function ensureTempWorkspaceSeed() {
+  if (process.env.SEED_DEMO_DATA !== 'true') {
+    return;
+  }
+  if (!process.env.DEMO_STUDENT_PASSWORD || !process.env.DEMO_FACULTY_PASSWORD) {
+    console.warn('Demo workspace seed skipped; set DEMO_STUDENT_PASSWORD and DEMO_FACULTY_PASSWORD explicitly.');
+    return;
+  }
   const pool = getPool();
   const tempStudentIdentifier = 'TEMPSTU001';
   const tempFacultyIdentifier = 'TEMPFAC001';
@@ -693,7 +1031,7 @@ async function ensureTempWorkspaceSeed() {
     email: 'temp.student@portal.local',
     role: 'student',
     department: 'Computer Science',
-    password: 'student123'
+    password: process.env.DEMO_STUDENT_PASSWORD
   });
 
   const tempFaculty = await ensureUser({
@@ -702,7 +1040,7 @@ async function ensureTempWorkspaceSeed() {
     email: 'temp.faculty@portal.local',
     role: 'faculty',
     department: 'Computer Science',
-    password: 'faculty123'
+    password: process.env.DEMO_FACULTY_PASSWORD
   });
 
   if (tempStudent && tempFaculty) {
@@ -776,7 +1114,7 @@ app.get('/api/health', async (_req, res) => {
       ok: false,
       server: 'running',
       database: 'disconnected',
-      error: error.message,
+      error: 'Database connection failed.',
       timestamp: new Date().toISOString()
     });
   }
@@ -786,7 +1124,7 @@ app.get('/', (_req, res) => {
   res.status(200).send('Student Portal API is running. Use /api/health for status.');
 });
 
-app.get('/api/users', async (_req, res) => {
+app.get('/api/users', requireRoles('admin'), async (_req, res) => {
   try {
     const pool = getPool();
     const [rows] = await pool.query(
@@ -795,28 +1133,41 @@ app.get('/api/users', async (_req, res) => {
 
     res.json({ ok: true, users: rows.map(toSafeUser) });
   } catch (error) {
-    res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
-app.get('/api/projects', async (_req, res) => {
+app.get('/api/projects', async (req, res) => {
   try {
     const pool = getPool();
-    const [rows] = await pool.query('SELECT * FROM projects ORDER BY updated_at DESC, created_at DESC LIMIT 200');
+    let query = 'SELECT * FROM projects ORDER BY updated_at DESC, created_at DESC LIMIT 200';
+    let params = [];
+    if (String(req.auth.role).toLowerCase() === 'student') {
+      query = 'SELECT * FROM projects WHERE owner_identifier = ? ORDER BY updated_at DESC, created_at DESC LIMIT 200';
+      params = [req.auth.sub];
+    } else if (String(req.auth.role).toLowerCase() === 'faculty') {
+      query = `SELECT p.*
+        FROM projects p
+        INNER JOIN users s ON s.identifier = p.owner_identifier
+        WHERE s.assigned_faculty_identifier = ?
+        ORDER BY p.updated_at DESC, p.created_at DESC LIMIT 200`;
+      params = [req.auth.sub];
+    }
+    const [rows] = await pool.query(query, params);
 
     return res.json({
       ok: true,
       projects: rows.map(toSafeProject)
     });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
-app.post('/api/projects', async (req, res) => {
+app.post('/api/projects', requireRoles('student'), async (req, res) => {
   const name = String(req.body?.name || '').trim();
   const description = String(req.body?.description || '').trim();
-  const ownerIdentifier = String(req.body?.ownerIdentifier || '').trim();
+  const ownerIdentifier = String(req.auth.sub || '').trim();
   const department = String(req.body?.department || '').trim();
   const deadline = normalizeDateOrNull(req.body?.deadline);
 
@@ -853,13 +1204,13 @@ app.post('/api/projects', async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM projects WHERE id = ? LIMIT 1', [projectId]);
     return res.status(201).json({ ok: true, project: toSafeProject(rows[0]) });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
-app.delete('/api/projects/:projectId', async (req, res) => {
+app.delete('/api/projects/:projectId', requireRoles('student', 'admin'), async (req, res) => {
   const projectId = String(req.params.projectId || '').trim();
-  const ownerIdentifier = String(req.body?.ownerIdentifier || req.query?.ownerIdentifier || '').trim();
+  const ownerIdentifier = String(req.auth.sub || '').trim();
 
   if (!projectId) {
     return res.status(400).json({ ok: false, error: 'projectId is required' });
@@ -878,14 +1229,15 @@ app.delete('/api/projects/:projectId', async (req, res) => {
       return res.status(404).json({ ok: false, error: 'Project not found' });
     }
 
-    if (String(project.owner_identifier || '').toLowerCase() !== ownerIdentifier.toLowerCase()) {
+    if (String(req.auth.role).toLowerCase() !== 'admin'
+      && String(project.owner_identifier || '').toLowerCase() !== ownerIdentifier.toLowerCase()) {
       return res.status(403).json({ ok: false, error: 'You can only delete your own projects' });
     }
 
     await pool.query('DELETE FROM projects WHERE id = ?', [projectId]);
     return res.json({ ok: true, deletedProjectId: projectId });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
@@ -897,17 +1249,20 @@ app.get('/api/projects/:projectId/tasks', async (req, res) => {
 
   try {
     const pool = getPool();
+    if (!await canAccessProject(pool, req, projectId)) {
+      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
+    }
     const [rows] = await pool.query(
       'SELECT * FROM project_tasks WHERE project_id = ? ORDER BY created_at ASC',
       [projectId]
     );
     return res.json({ ok: true, tasks: rows.map(toSafeProjectTask) });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
-app.put('/api/projects/:projectId/tasks', async (req, res) => {
+app.put('/api/projects/:projectId/tasks', requireRoles('faculty', 'admin'), async (req, res) => {
   const projectId = String(req.params.projectId || '').trim();
   const tasks = Array.isArray(req.body?.tasks) ? req.body.tasks : null;
 
@@ -919,9 +1274,15 @@ app.put('/api/projects/:projectId/tasks', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'tasks array is required' });
   }
 
+  let connection;
   try {
     const pool = getPool();
-    await pool.query('DELETE FROM project_tasks WHERE project_id = ?', [projectId]);
+    if (!await canAccessProject(pool, req, projectId)) {
+      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
+    }
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    await connection.query('DELETE FROM project_tasks WHERE project_id = ?', [projectId]);
 
     for (const task of tasks) {
       const taskId = String(task?.id || `TSK-${Date.now()}-${Math.floor(Math.random() * 1000)}`).trim();
@@ -931,7 +1292,7 @@ app.put('/api/projects/:projectId/tasks', async (req, res) => {
         continue;
       }
 
-      await pool.query(
+      await connection.query(
         `INSERT INTO project_tasks
          (id, project_id, title, description, assigned_to_id, assigned_to_name, status, deadline, contribution_percent)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -949,13 +1310,19 @@ app.put('/api/projects/:projectId/tasks', async (req, res) => {
       );
     }
 
-    const [rows] = await pool.query(
+    const [rows] = await connection.query(
       'SELECT * FROM project_tasks WHERE project_id = ? ORDER BY created_at ASC',
       [projectId]
     );
+    await connection.commit();
+    connection.release();
     return res.json({ ok: true, tasks: rows.map(toSafeProjectTask) });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    if (connection) {
+      await connection.rollback().catch(() => {});
+      connection.release();
+    }
+    return sendServerError(res, error);
   }
 });
 
@@ -967,17 +1334,20 @@ app.get('/api/projects/:projectId/files', async (req, res) => {
 
   try {
     const pool = getPool();
+    if (!await canAccessProject(pool, req, projectId)) {
+      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
+    }
     const [rows] = await pool.query(
       'SELECT * FROM project_files WHERE project_id = ? ORDER BY created_at ASC',
       [projectId]
     );
     return res.json({ ok: true, files: rows.map(toSafeProjectFile) });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
-app.put('/api/projects/:projectId/files', async (req, res) => {
+app.put('/api/projects/:projectId/files', requireRoles('student', 'faculty', 'admin'), async (req, res) => {
   const projectId = String(req.params.projectId || '').trim();
   const files = Array.isArray(req.body?.files) ? req.body.files : null;
 
@@ -989,9 +1359,15 @@ app.put('/api/projects/:projectId/files', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'files array is required' });
   }
 
+  let connection;
   try {
     const pool = getPool();
-    await pool.query('DELETE FROM project_files WHERE project_id = ?', [projectId]);
+    if (!await canAccessProject(pool, req, projectId)) {
+      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
+    }
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    await connection.query('DELETE FROM project_files WHERE project_id = ?', [projectId]);
 
     for (const file of files) {
       const fileId = String(file?.id || `FILE-${Date.now()}-${Math.floor(Math.random() * 1000)}`).trim();
@@ -1001,7 +1377,7 @@ app.put('/api/projects/:projectId/files', async (req, res) => {
         continue;
       }
 
-      await pool.query(
+      await connection.query(
         `INSERT INTO project_files
          (id, project_id, file_name, file_size, file_type, mime_type, uploaded_by, uploaded_by_name, uploaded_date, version, description, download_count, is_submitted, submitted_date, updated_date)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1025,13 +1401,19 @@ app.put('/api/projects/:projectId/files', async (req, res) => {
       );
     }
 
-    const [rows] = await pool.query(
+    const [rows] = await connection.query(
       'SELECT * FROM project_files WHERE project_id = ? ORDER BY created_at ASC',
       [projectId]
     );
+    await connection.commit();
+    connection.release();
     return res.json({ ok: true, files: rows.map(toSafeProjectFile) });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    if (connection) {
+      await connection.rollback().catch(() => {});
+      connection.release();
+    }
+    return sendServerError(res, error);
   }
 });
 
@@ -1043,17 +1425,20 @@ app.get('/api/projects/:projectId/feedback-corrections', async (req, res) => {
 
   try {
     const pool = getPool();
+    if (!await canAccessProject(pool, req, projectId)) {
+      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
+    }
     const [rows] = await pool.query(
       'SELECT * FROM project_feedback_corrections WHERE project_id = ? ORDER BY created_at DESC',
       [projectId]
     );
     return res.json({ ok: true, corrections: rows.map(toSafeFeedbackCorrection) });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
-app.post('/api/projects/:projectId/feedback-corrections', async (req, res) => {
+app.post('/api/projects/:projectId/feedback-corrections', requireRoles('faculty', 'admin'), async (req, res) => {
   const projectId = String(req.params.projectId || '').trim();
   const studentIdentifier = String(req.body?.studentIdentifier || '').trim();
   const note = String(req.body?.note || '').trim();
@@ -1068,6 +1453,9 @@ app.post('/api/projects/:projectId/feedback-corrections', async (req, res) => {
 
   try {
     const pool = getPool();
+    if (!await canAccessProject(pool, req, projectId)) {
+      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
+    }
     const correctionId = `CORR-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     await pool.query(
@@ -1083,11 +1471,11 @@ app.post('/api/projects/:projectId/feedback-corrections', async (req, res) => {
 
     return res.status(201).json({ ok: true, correction: toSafeFeedbackCorrection(rows[0]) });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
-app.post('/api/admin/assign-student-faculty', async (req, res) => {
+app.post('/api/admin/assign-student-faculty', requireRoles('admin'), async (req, res) => {
   const studentIdentifier = String(req.body?.studentIdentifier || '').trim();
   const facultyIdentifier = String(req.body?.facultyIdentifier || '').trim();
 
@@ -1123,11 +1511,11 @@ app.post('/api/admin/assign-student-faculty', async (req, res) => {
       }
     });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
-app.get('/api/admin/student-faculty-assignments', async (_req, res) => {
+app.get('/api/admin/student-faculty-assignments', requireRoles('admin'), async (_req, res) => {
   try {
     const pool = getPool();
     const [rows] = await pool.query(`
@@ -1153,7 +1541,7 @@ app.get('/api/admin/student-faculty-assignments', async (_req, res) => {
 
     return res.json({ ok: true, assignments });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
@@ -1161,6 +1549,9 @@ app.get('/api/profile/:identifier', async (req, res) => {
   const normalizedIdentifier = String(req.params.identifier || '').trim();
   if (!normalizedIdentifier) {
     return res.status(400).json({ ok: false, error: 'identifier is required' });
+  }
+  if (!isSelfOrAdmin(req, normalizedIdentifier)) {
+    return res.status(403).json({ ok: false, error: 'You can only view your own profile.' });
   }
 
   try {
@@ -1172,7 +1563,7 @@ app.get('/api/profile/:identifier', async (req, res) => {
 
     return res.json({ ok: true, user: toSafeUser(user) });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
@@ -1181,13 +1572,23 @@ app.patch('/api/profile/:identifier', async (req, res) => {
   if (!normalizedIdentifier) {
     return res.status(400).json({ ok: false, error: 'identifier is required' });
   }
+  if (!isSelfOrAdmin(req, normalizedIdentifier)) {
+    return res.status(403).json({ ok: false, error: 'You can only update your own profile.' });
+  }
 
   const updates = [];
   const params = [];
+  const adminOnlyFields = new Set([
+    'accessLevel',
+    'permissions',
+    'isActive',
+    'twoFactorEnabled',
+    'emergencyContact'
+  ]);
 
   Object.keys(req.body || {}).forEach((inputKey) => {
     const dbField = PROFILE_FIELD_MAP[inputKey];
-    if (!dbField) {
+    if (!dbField || (adminOnlyFields.has(inputKey) && String(req.auth.role).toLowerCase() !== 'admin')) {
       return;
     }
 
@@ -1221,7 +1622,7 @@ app.patch('/api/profile/:identifier', async (req, res) => {
 
     return res.json({ ok: true, user: toSafeUser(updatedUser) });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
@@ -1239,6 +1640,9 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
     if (!user) {
       return res.status(401).json({ ok: false, error: 'Invalid credentials' });
     }
+    if (!user.is_active) {
+      return res.status(403).json({ ok: false, error: 'This account is inactive.' });
+    }
 
     const isPasswordValid = await verifyPasswordAndMigrate(pool, user, password);
     if (!isPasswordValid) {
@@ -1249,13 +1653,21 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
       const userKey = `${user.role}-${user.identifier}`;
       const otpCode = issueUniqueOtp(userKey);
       const otpSessionId = `otp-${user.identifier}-${Date.now()}`;
+      const expiresAt = Date.now() + OTP_SESSION_TTL_MS;
+      if (!await deliverOtp(user, otpCode, expiresAt)) {
+        return res.status(503).json({
+          ok: false,
+          error: 'Multi-factor authentication is temporarily unavailable.'
+        });
+      }
 
       otpSessions.set(otpSessionId, {
         user,
         role: user.role,
         userKey,
         otpCode,
-        expiresAt: Date.now() + (5 * 60 * 1000),
+        expiresAt,
+        attempts: 0,
         resendCount: 0,
         lastResendTime: 0
       });
@@ -1266,8 +1678,7 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
         otpSessionId,
         maskedPhone: maskPhone(user.phone),
         role: user.role,
-        demoOtp: otpCode,
-        expiresAt: otpSessions.get(otpSessionId).expiresAt
+        expiresAt
       });
     }
 
@@ -1279,11 +1690,11 @@ app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
       user: toSafeUser(user)
     });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
-app.post('/api/auth/verify-otp', (req, res) => {
+app.post('/api/auth/verify-otp', sensitiveAuthRateLimiter, (req, res) => {
   const { otpSessionId, otpCode } = req.body;
 
   if (!otpSessionId || !otpCode) {
@@ -1300,7 +1711,12 @@ app.post('/api/auth/verify-otp', (req, res) => {
     return res.status(400).json({ ok: false, error: 'OTP expired. Please login again.' });
   }
 
+  session.attempts += 1;
   if (String(session.otpCode) !== String(otpCode).trim()) {
+    if (session.attempts >= MAX_OTP_ATTEMPTS) {
+      otpSessions.delete(otpSessionId);
+      return res.status(400).json({ ok: false, error: 'Too many invalid OTP attempts. Please login again.' });
+    }
     return res.status(400).json({ ok: false, error: 'Invalid OTP code' });
   }
 
@@ -1314,7 +1730,7 @@ app.post('/api/auth/verify-otp', (req, res) => {
   });
 });
 
-app.post('/api/auth/resend-otp', (req, res) => {
+app.post('/api/auth/resend-otp', sensitiveAuthRateLimiter, async (req, res) => {
   const { otpSessionId } = req.body;
 
   if (!otpSessionId) {
@@ -1337,8 +1753,15 @@ app.post('/api/auth/resend-otp', (req, res) => {
   }
 
   const newOtpCode = issueUniqueOtp(session.userKey, session.otpCode);
+  const expiresAt = Date.now() + OTP_SESSION_TTL_MS;
+  if (!await deliverOtp(session.user, newOtpCode, expiresAt)) {
+    return res.status(503).json({
+      ok: false,
+      error: 'Multi-factor authentication is temporarily unavailable.'
+    });
+  }
   session.otpCode = newOtpCode;
-  session.expiresAt = Date.now() + (5 * 60 * 1000);
+  session.expiresAt = expiresAt;
   session.resendCount += 1;
   session.lastResendTime = Date.now();
 
@@ -1348,14 +1771,13 @@ app.post('/api/auth/resend-otp', (req, res) => {
     ok: true,
     otpSent: true,
     maskedPhone: maskPhone(session.user.phone),
-    demoOtp: newOtpCode,
     expiresAt: session.expiresAt,
     resendCount: session.resendCount,
     remainingAttempts: 3 - session.resendCount
   });
 });
 
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', sensitiveAuthRateLimiter, async (req, res) => {
   const { identifier } = req.body;
   const normalizedIdentifier = String(identifier || '').trim();
 
@@ -1367,17 +1789,35 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     const pool = getPool();
     const user = await findUserByIdentifierOrEmail(pool, normalizedIdentifier);
 
-    if (!user) {
-      return res.status(404).json({ ok: false, error: 'No account found for this identifier.' });
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = Date.now() + (15 * 60 * 1000);
+      if (!await deliverPasswordReset(user, resetToken, expiresAt)) {
+        console.error('Password reset delivery is unavailable.');
+        return res.json({
+          ok: true,
+          success: true,
+          message: 'If the account exists, password reset instructions have been sent.'
+        });
+      }
+      passwordResetTokens.set(resetToken, {
+        userId: user.id,
+        expiresAt
+      });
+      return res.json({
+        ok: true,
+        success: true,
+        message: 'If the account exists, password reset instructions have been sent.'
+      });
     }
 
     return res.json({
       ok: true,
       success: true,
-      message: 'Password reset instructions sent to your registered contact.'
+      message: 'If the account exists, password reset instructions have been sent.'
     });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
@@ -1389,12 +1829,16 @@ app.post('/api/auth/reset-initial-password', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'identifier and newPassword are required' });
   }
 
-  if (String(newPassword).trim().length < 6) {
-    return res.status(400).json({ ok: false, error: 'New password must be at least 6 characters.' });
+  const passwordErrors = validatePasswordStrength(String(newPassword));
+  if (passwordErrors.length > 0) {
+    return res.status(400).json({ ok: false, error: passwordErrors.join('. ') });
   }
 
   try {
     const pool = getPool();
+    if (!isSelfOrAdmin(req, normalizedIdentifier)) {
+      return res.status(403).json({ ok: false, error: 'You can only reset your own password.' });
+    }
     const user = await findUserByIdentifierOrEmail(pool, normalizedIdentifier);
     if (!user) {
       return res.status(404).json({ ok: false, error: 'User not found' });
@@ -1414,7 +1858,35 @@ app.post('/api/auth/reset-initial-password', async (req, res) => {
     }
     return res.json({ ok: true, user: toSafeUser(updatedUser) });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
+  }
+});
+
+app.post('/api/auth/reset-password', sensitiveAuthRateLimiter, async (req, res) => {
+  const { resetToken, newPassword } = req.body || {};
+  const passwordErrors = validatePasswordStrength(String(newPassword || ''));
+  if (!resetToken || passwordErrors.length > 0) {
+    return res.status(400).json({
+      ok: false,
+      error: passwordErrors.length > 0 ? passwordErrors.join('. ') : 'resetToken and newPassword are required'
+    });
+  }
+
+  const tokenRecord = takePasswordResetToken(resetToken);
+  if (!tokenRecord) {
+    return res.status(400).json({ ok: false, error: 'Reset token is invalid or expired.' });
+  }
+
+  try {
+    const pool = getPool();
+    const passwordHash = await bcrypt.hash(String(newPassword), BCRYPT_SALT_ROUNDS);
+    await pool.query(
+      'UPDATE users SET password = ?, must_reset_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [passwordHash, tokenRecord.userId]
+    );
+    return res.json({ ok: true, message: 'Password reset successfully.' });
+  } catch (error) {
+    return sendServerError(res, error);
   }
 });
 
@@ -1426,8 +1898,12 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 
   const normalizedRole = String(role).trim().toLowerCase();
-  if (!['student', 'faculty', 'admin'].includes(normalizedRole)) {
-    return res.status(400).json({ ok: false, error: 'role must be student, faculty or admin' });
+  if (normalizedRole !== 'student') {
+    return res.status(403).json({ ok: false, error: 'Public signup is limited to student accounts.' });
+  }
+  const passwordErrors = validatePasswordStrength(String(password));
+  if (passwordErrors.length > 0) {
+    return res.status(400).json({ ok: false, error: passwordErrors.join('. ') });
   }
 
   try {
@@ -1465,7 +1941,7 @@ app.post('/api/auth/signup', async (req, res) => {
     if (error && error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ ok: false, error: 'User already exists with this identifier or email.' });
     }
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
@@ -1484,7 +1960,7 @@ app.post('/api/auth/verify-token', (req, res) => {
   }
 });
 
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', requireRoles('admin'), async (req, res) => {
   const { identifier, name, email, role, department, phone, password } = req.body;
 
   if (!identifier || !name || !email || !role || !password) {
@@ -1492,6 +1968,15 @@ app.post('/api/users', async (req, res) => {
       ok: false,
       error: 'identifier, name, email, role and password are required'
     });
+  }
+
+  const normalizedRole = String(role).trim().toLowerCase();
+  if (!['student', 'faculty'].includes(normalizedRole)) {
+    return res.status(400).json({ ok: false, error: 'Admin-created role must be student or faculty.' });
+  }
+  const passwordErrors = validatePasswordStrength(String(password));
+  if (passwordErrors.length > 0) {
+    return res.status(400).json({ ok: false, error: passwordErrors.join('. ') });
   }
 
   try {
@@ -1504,7 +1989,7 @@ app.post('/api/users', async (req, res) => {
         String(identifier).trim().toUpperCase(),
         String(name).trim(),
         String(email).trim().toLowerCase(),
-        String(role).trim().toLowerCase(),
+        normalizedRole,
         String(department || '').trim() || null,
         String(phone || '').trim() || null,
         1,
@@ -1533,12 +2018,12 @@ app.post('/api/users', async (req, res) => {
     if (error && error.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ ok: false, error: 'User already exists with this identifier or email.' });
     }
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
 // ========== DASHBOARD STATS ENDPOINTS ==========
-app.get('/api/stats/dashboard', async (_req, res) => {
+app.get('/api/stats/dashboard', requireRoles('admin'), async (_req, res) => {
   try {
     const pool = getPool();
     const [studentCount] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = ?', ['student']);
@@ -1556,7 +2041,7 @@ app.get('/api/stats/dashboard', async (_req, res) => {
       }
     });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
@@ -1569,11 +2054,28 @@ app.post('/api/upload/profile-photo/:identifier', uploadMiddleware.single('profi
 
     const { identifier } = req.params;
     if (!identifier) {
-      fs.unlinkSync(req.file.path);
+      safeUnlink(req.file.path);
       return res.status(400).json({ ok: false, error: 'Identifier is required' });
+    }
+    if (!isSelfOrAdmin(req, identifier)) {
+      safeUnlink(req.file.path);
+      return res.status(403).json({ ok: false, error: 'You can only upload your own profile photo.' });
+    }
+    if (!hasValidImageSignature(req.file.path)) {
+      safeUnlink(req.file.path);
+      return res.status(400).json({ ok: false, error: 'The uploaded file is not a valid image.' });
     }
 
     const pool = getPool();
+    const [rows] = await pool.query(
+      'SELECT photo_url FROM users WHERE LOWER(identifier) = LOWER(?) LIMIT 1',
+      [identifier]
+    );
+    if (!rows[0]) {
+      safeUnlink(req.file.path);
+      return res.status(404).json({ ok: false, error: 'User profile not found.' });
+    }
+    const previousPhotoPath = rows[0].photo_url;
     const photoUrl = `/uploads/profile-photos/${req.file.filename}`;
 
     // Update user with photo URL
@@ -1581,23 +2083,29 @@ app.post('/api/upload/profile-photo/:identifier', uploadMiddleware.single('profi
       'UPDATE users SET photo_url = ?, updated_at = NOW() WHERE identifier = ?',
       [photoUrl, identifier]
     );
+    if (previousPhotoPath && path.basename(previousPhotoPath) !== req.file.filename) {
+      safeUnlink(path.join(uploadsDir, path.basename(previousPhotoPath)));
+    }
 
     return res.json({
       ok: true,
       message: 'Profile photo uploaded successfully',
-      photoUrl
+      photoUrl: createPhotoUrl(photoUrl)
     });
   } catch (error) {
     if (req.file && req.file.path) {
-      fs.unlinkSync(req.file.path);
+      safeUnlink(req.file.path);
     }
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
 app.get('/api/profile-photo/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
+    if (!isSelfOrAdmin(req, identifier)) {
+      return res.status(403).json({ ok: false, error: 'You can only view your own profile photo.' });
+    }
     const pool = getPool();
 
     const [rows] = await pool.query(
@@ -1611,16 +2119,19 @@ app.get('/api/profile-photo/:identifier', async (req, res) => {
 
     return res.json({
       ok: true,
-      photoUrl: rows[0].photo_url
+      photoUrl: createPhotoUrl(rows[0].photo_url)
     });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
 app.delete('/api/profile-photo/:identifier', async (req, res) => {
   try {
     const { identifier } = req.params;
+    if (!isSelfOrAdmin(req, identifier)) {
+      return res.status(403).json({ ok: false, error: 'You can only delete your own profile photo.' });
+    }
     const pool = getPool();
 
     const [rows] = await pool.query(
@@ -1629,11 +2140,7 @@ app.delete('/api/profile-photo/:identifier', async (req, res) => {
     );
 
     if (rows[0]?.photo_url) {
-      const relativePhotoPath = String(rows[0].photo_url || '').replace(/^\//, '');
-      const filePath = path.join(__dirname, relativePhotoPath);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
+      safeUnlink(path.join(uploadsDir, path.basename(String(rows[0].photo_url))));
     }
 
     await pool.query(
@@ -1646,16 +2153,25 @@ app.delete('/api/profile-photo/:identifier', async (req, res) => {
       message: 'Profile photo deleted successfully'
     });
   } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
+    return sendServerError(res, error);
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  // eslint-disable-next-line no-console
-  console.log(`Server running on port ${PORT}`);
+app.use((error, _req, res, next) => {
+  if (error instanceof multer.MulterError || String(error.message || '').startsWith('Invalid file type')) {
+    return res.status(400).json({ ok: false, error: error.message || 'Invalid upload.' });
+  }
+  console.error(error);
+  return next(error);
+});
+
+app.use((error, _req, res, _next) => {
+  console.error(error);
+  return res.status(500).json({ ok: false, error: 'An unexpected server error occurred.' });
 });
 
 async function bootstrapData() {
+  await ensureRoleTables();
   await ensureProjectsTable();
   await ensureProjectWorkspaceTables();
   await ensureStudentFacultyAssignmentColumn();
@@ -1663,7 +2179,29 @@ async function bootstrapData() {
   await ensureTempWorkspaceSeed();
 }
 
-bootstrapData().catch((error) => {
-  // eslint-disable-next-line no-console
-  console.error(`Failed during bootstrap: ${error.message}`);
-});
+if (require.main === module) {
+  if (!JWT_SECRET || JWT_SECRET.length < 32) {
+    throw new Error('JWT_SECRET must be configured with at least 32 characters before starting the server.');
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+
+  bootstrapData().catch((error) => {
+    console.error(`Failed during bootstrap: ${error.message}`);
+  });
+}
+
+module.exports = {
+  app,
+  authenticateRequest,
+  requireRoles,
+  isSelfOrAdmin,
+  __test: {
+    otpSessions,
+    passwordResetTokens,
+    takePasswordResetToken,
+    deliverWebhookMessage
+  }
+};

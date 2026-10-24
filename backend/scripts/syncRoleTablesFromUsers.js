@@ -5,6 +5,9 @@ const { getPool } = require('../db');
 async function syncRoleTablesFromUsers() {
   const pool = getPool();
 
+  await pool.query('UPDATE student SET password = NULL');
+  await pool.query('UPDATE faculty SET password = NULL');
+  await pool.query('UPDATE admin SET password = NULL');
   const [users] = await pool.query('SELECT * FROM users');
 
   for (const user of users) {
@@ -45,7 +48,7 @@ async function syncRoleTablesFromUsers() {
           identifier,
           user.name,
           email,
-          user.password || null,
+          null,
           user.department || null,
           user.semester || null,
           user.section || null,
@@ -87,7 +90,7 @@ async function syncRoleTablesFromUsers() {
           identifier,
           user.name,
           email,
-          user.password || null,
+          null,
           user.department || null,
           user.designation || null,
           user.specialization || null,
@@ -127,7 +130,7 @@ async function syncRoleTablesFromUsers() {
           identifier,
           user.name,
           email,
-          user.password || null,
+          null,
           'admin',
           normalizedAccessLevel,
           user.permissions_json || null,

@@ -11,6 +11,17 @@ function wait(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function authFetch(url, options = {}) {
+  const token = sessionStorage.getItem('student-portal-token');
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    }
+  });
+}
+
 async function apiRequest(path, options = {}) {
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, options);
@@ -52,7 +63,6 @@ export async function loginUser(identifier, password) {
       otpSessionId: payload.otpSessionId,
       maskedPhone: payload.maskedPhone,
       role: payload.role,
-      demoOtp: payload.demoOtp,
       expiresAt: payload.expiresAt
     };
   }
@@ -88,7 +98,6 @@ export async function resendOtp(otpSessionId) {
   return {
     otpSent: payload.otpSent,
     maskedPhone: payload.maskedPhone,
-    demoOtp: payload.demoOtp,
     expiresAt: payload.expiresAt,
     resendCount: payload.resendCount,
     remainingAttempts: payload.remainingAttempts
@@ -110,7 +119,7 @@ export async function requestPasswordReset(identifier) {
 }
 
 export async function signupUser(identifier, name, email, password, role = 'student') {
-  const response = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+  const response = await authFetch(`${API_BASE_URL}/api/auth/signup`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -126,7 +135,7 @@ export async function signupUser(identifier, name, email, password, role = 'stud
 }
 
 export async function verifyToken(token) {
-  const response = await fetch(`${API_BASE_URL}/api/auth/verify-token`, {
+  const response = await authFetch(`${API_BASE_URL}/api/auth/verify-token`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -139,13 +148,13 @@ export async function verifyToken(token) {
 }
 
 export async function getUserProfile(identifier) {
-  const response = await fetch(`${API_BASE_URL}/api/profile/${encodeURIComponent(identifier)}`);
+  const response = await authFetch(`${API_BASE_URL}/api/profile/${encodeURIComponent(identifier)}`);
   const payload = await parseResponse(response);
   return payload.user;
 }
 
 export async function updateUserProfile(identifier, profilePatch) {
-  const response = await fetch(`${API_BASE_URL}/api/profile/${encodeURIComponent(identifier)}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/profile/${encodeURIComponent(identifier)}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json'
@@ -158,7 +167,7 @@ export async function updateUserProfile(identifier, profilePatch) {
 }
 
 export async function resetInitialPassword(identifier, newPassword) {
-  const response = await fetch(`${API_BASE_URL}/api/auth/reset-initial-password`, {
+  const response = await authFetch(`${API_BASE_URL}/api/auth/reset-initial-password`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -171,14 +180,12 @@ export async function resetInitialPassword(identifier, newPassword) {
 }
 
 export async function registerAdminCreatedUser({ identifier, name, email, department, role, phone }) {
-  const normalizedRole = String(role || '').toLowerCase();
-  const defaultPassword = normalizedRole === 'student'
-    ? 'student123'
-    : normalizedRole === 'faculty'
-      ? 'faculty123'
-      : 'admin009';
+  const randomBytes = new Uint32Array(16);
+  window.crypto.getRandomValues(randomBytes);
+  const defaultPassword = Array.from(randomBytes, (value) => (value % 36).toString(36)).join('')
+    .slice(0, 12) + 'A1!';
 
-  const response = await fetch(`${API_BASE_URL}/api/users`, {
+  const response = await authFetch(`${API_BASE_URL}/api/users`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -207,7 +214,7 @@ export async function uploadProfilePhoto(identifier, file) {
   const formData = new FormData();
   formData.append('profilePhoto', file);
 
-  const response = await fetch(`${API_BASE_URL}/api/upload/profile-photo/${encodeURIComponent(identifier)}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/upload/profile-photo/${encodeURIComponent(identifier)}`, {
     method: 'POST',
     body: formData
   });
@@ -217,13 +224,13 @@ export async function uploadProfilePhoto(identifier, file) {
 }
 
 export async function getProfilePhotoUrl(identifier) {
-  const response = await fetch(`${API_BASE_URL}/api/profile-photo/${encodeURIComponent(identifier)}`);
+  const response = await authFetch(`${API_BASE_URL}/api/profile-photo/${encodeURIComponent(identifier)}`);
   const payload = await parseResponse(response);
   return payload.photoUrl;
 }
 
 export async function deleteProfilePhoto(identifier) {
-  const response = await fetch(`${API_BASE_URL}/api/profile-photo/${encodeURIComponent(identifier)}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/profile-photo/${encodeURIComponent(identifier)}`, {
     method: 'DELETE'
   });
 
@@ -232,19 +239,19 @@ export async function deleteProfilePhoto(identifier) {
 }
 
 export async function getAllUsers() {
-  const response = await fetch(`${API_BASE_URL}/api/users`);
+  const response = await authFetch(`${API_BASE_URL}/api/users`);
   const payload = await parseResponse(response);
   return payload.users || [];
 }
 
 export async function getAllProjects() {
-  const response = await fetch(`${API_BASE_URL}/api/projects`);
+  const response = await authFetch(`${API_BASE_URL}/api/projects`);
   const payload = await parseResponse(response);
   return payload.projects || [];
 }
 
 export async function createStudentProject({ name, description, deadline, ownerIdentifier, department }) {
-  const response = await fetch(`${API_BASE_URL}/api/projects`, {
+  const response = await authFetch(`${API_BASE_URL}/api/projects`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -263,7 +270,7 @@ export async function createStudentProject({ name, description, deadline, ownerI
 }
 
 export async function deleteStudentProject(projectId, ownerIdentifier) {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}`, {
+  const response = await authFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}`, {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json'
@@ -276,7 +283,7 @@ export async function deleteStudentProject(projectId, ownerIdentifier) {
 }
 
 export async function assignStudentToFaculty(studentIdentifier, facultyIdentifier) {
-  const response = await fetch(`${API_BASE_URL}/api/admin/assign-student-faculty`, {
+  const response = await authFetch(`${API_BASE_URL}/api/admin/assign-student-faculty`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -289,19 +296,19 @@ export async function assignStudentToFaculty(studentIdentifier, facultyIdentifie
 }
 
 export async function getStudentFacultyAssignments() {
-  const response = await fetch(`${API_BASE_URL}/api/admin/student-faculty-assignments`);
+  const response = await authFetch(`${API_BASE_URL}/api/admin/student-faculty-assignments`);
   const payload = await parseResponse(response);
   return payload.assignments || [];
 }
 
 export async function getProjectTasks(projectId) {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/tasks`);
+  const response = await authFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/tasks`);
   const payload = await parseResponse(response);
   return payload.tasks || [];
 }
 
 export async function saveProjectTasks(projectId, tasks) {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/tasks`, {
+  const response = await authFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/tasks`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json'
@@ -314,13 +321,13 @@ export async function saveProjectTasks(projectId, tasks) {
 }
 
 export async function getProjectFiles(projectId) {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/files`);
+  const response = await authFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/files`);
   const payload = await parseResponse(response);
   return payload.files || [];
 }
 
 export async function saveProjectFiles(projectId, files) {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/files`, {
+  const response = await authFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/files`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json'
@@ -333,13 +340,13 @@ export async function saveProjectFiles(projectId, files) {
 }
 
 export async function getProjectFeedbackCorrections(projectId) {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/feedback-corrections`);
+  const response = await authFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/feedback-corrections`);
   const payload = await parseResponse(response);
   return payload.corrections || [];
 }
 
 export async function addProjectFeedbackCorrection(projectId, studentIdentifier, note) {
-  const response = await fetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/feedback-corrections`, {
+  const response = await authFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/feedback-corrections`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'

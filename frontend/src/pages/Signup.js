@@ -8,7 +8,7 @@ function Signup() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('student');
+  const role = 'student';
   const [error, setError] = useState('');
   const { signup } = useAuth();
   const navigate = useNavigate();
@@ -75,11 +75,7 @@ function Signup() {
           onChange={(event) => setPassword(event.target.value)}
           required
         />
-        <select value={role} onChange={(event) => setRole(event.target.value)}>
-          <option value="student">Student</option>
-          <option value="faculty">Faculty</option>
-          <option value="admin">Admin</option>
-        </select>
+        <p className="auth-subtext">Public registration creates student accounts. Faculty and administrator accounts must be created by an administrator.</p>
         {error ? <p className="error">{error}</p> : null}
         <button type="submit" className="btn">Create Account</button>
         <p>

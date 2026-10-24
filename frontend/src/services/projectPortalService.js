@@ -67,7 +67,7 @@ function getDefaultStore() {
         email: 'admin@portal.com',
         phone: '+91 9876512345',
         role: 'admin',
-        passwordHash: simpleHashPassword('admin123'),
+        passwordHash: null,
         createdAt: nowIso(),
         active: true
       },
@@ -77,7 +77,7 @@ function getDefaultStore() {
         email: 'mentor@portal.com',
         phone: '+91 9123456789',
         role: 'mentor',
-        passwordHash: simpleHashPassword('mentor123'),
+        passwordHash: null,
         createdAt: nowIso(),
         active: true
       },
@@ -87,7 +87,7 @@ function getDefaultStore() {
         email: 'student@portal.com',
         phone: '+91 9988776655',
         role: 'student',
-        passwordHash: simpleHashPassword('student123'),
+        passwordHash: null,
         createdAt: nowIso(),
         active: true
       }

@@ -160,7 +160,6 @@ function Login() {
       const resendResult = await resendOtp(otpSession.otpSessionId);
       setOtpSession((prev) => ({
         ...prev,
-        demoOtp: resendResult.demoOtp,
         expiresAt: resendResult.expiresAt
       }));
       setResendSuccess(true);
@@ -182,7 +181,7 @@ function Login() {
       </section>
 
       <form className="auth-form" onSubmit={handleSubmit}>
-        <h2>Sign In</h2>
+        <h2>Login</h2>
         {otpSession ? (
           <p className="auth-subtext">OTP sent to registered mail id {otpSession.maskedPhone}</p>
         ) : null}
@@ -208,7 +207,6 @@ function Login() {
             <div className="otp-progress" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={otpProgressPercent}>
               <div className={`otp-progress-fill ${otpTimeLeft === 0 ? 'otp-progress-expired' : ''}`} style={{ inlineSize: `${otpProgressPercent}%` }} />
             </div>
-            <p className="otp-demo">For demo: OTP is {otpSession.demoOtp}</p>
           </>
         ) : (
           <>
@@ -271,7 +269,7 @@ function Login() {
           className="btn auth-submit"
           disabled={Boolean(otpSession) && otpTimeLeft === 0}
         >
-          {otpSession ? 'Verify OTP' : 'Sign In'}
+          {otpSession ? 'Verify OTP' : 'Login'}
         </button>
 
         {otpSession ? (

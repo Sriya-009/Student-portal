@@ -211,7 +211,7 @@ A comprehensive faculty/mentor portal for managing student projects, providing f
 
 ### Faculty Login
 - **Faculty ID:** `MENTOR-001`, `MENTOR-002`, `MENTOR-003`
-- **Password:** `faculty123`
+- **Password:** `<configured faculty password>`
 
 **Available Mentors:**
 1. Dr. Amelia Foster (MENTOR-001) - Machine Learning specialist

@@ -331,12 +331,7 @@ export const projectFiles = [
 
 export const achievements = [];
 
-export const studentCredentials = [
-  { rollNumber: 'STU001', password: 'student123' },
-  { rollNumber: 'STU002', password: 'student123' },
-  { rollNumber: 'STU003', password: 'student123' },
-  { rollNumber: 'STU004', password: 'student123' }
-];
+export const studentCredentials = [];
 
 export const submissionEvents = [
   {
@@ -543,11 +538,7 @@ export const projectGrades = [
   }
 ];
 
-export const facultyCredentials = [
-  { facultyId: 'MENTOR-001', password: 'faculty123' },
-  { facultyId: 'MENTOR-002', password: 'faculty123' },
-  { facultyId: 'MENTOR-003', password: 'faculty123' }
-];
+export const facultyCredentials = [];
 
 export const profileUpdateRequests = [
   {

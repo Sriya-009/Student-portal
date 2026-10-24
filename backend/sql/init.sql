@@ -63,3 +63,115 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS must_reset_password TINYINT(1) NOT NU
 ALTER TABLE users ADD COLUMN IF NOT EXISTS assigned_faculty_identifier VARCHAR(50) NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url VARCHAR(255) NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
+CREATE TABLE IF NOT EXISTS student (
+  registration_no VARCHAR(80) PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(150) NOT NULL UNIQUE,
+  password VARCHAR(255) NULL,
+  course VARCHAR(120) NULL,
+  semester VARCHAR(20) NULL,
+  section VARCHAR(20) NULL,
+  batch_year VARCHAR(10) NULL,
+  date_of_birth DATE NULL,
+  guardian_name VARCHAR(120) NULL,
+  guardian_phone VARCHAR(30) NULL,
+  address VARCHAR(255) NULL,
+  profile_photo_url VARCHAR(255) NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  must_reset_password TINYINT(1) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS faculty (
+  employee_id VARCHAR(80) PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(150) NOT NULL UNIQUE,
+  password VARCHAR(255) NULL,
+  department VARCHAR(120) NULL,
+  designation VARCHAR(120) NULL,
+  specialization VARCHAR(120) NULL,
+  qualification VARCHAR(160) NULL,
+  office_location VARCHAR(120) NULL,
+  office_hours VARCHAR(120) NULL,
+  joining_date DATE NULL,
+  bio TEXT NULL,
+  profile_photo_url VARCHAR(255) NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  must_reset_password TINYINT(1) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS admin (
+  employee_id VARCHAR(80) PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(150) NOT NULL UNIQUE,
+  password VARCHAR(255) NULL,
+  role VARCHAR(20) NOT NULL DEFAULT 'admin',
+  access_level INT NOT NULL DEFAULT 1,
+  permissions_json JSON NULL,
+  two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0,
+  emergency_contact VARCHAR(30) NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  must_reset_password TINYINT(1) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS projects (
+  id VARCHAR(60) PRIMARY KEY,
+  name VARCHAR(180) NOT NULL,
+  description TEXT NULL,
+  department VARCHAR(120) NULL,
+  status VARCHAR(40) NOT NULL DEFAULT 'ongoing',
+  progress_percent INT NOT NULL DEFAULT 0,
+  deadline DATE NULL,
+  owner_identifier VARCHAR(50) NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_projects_owner (owner_identifier)
+);
+
+CREATE TABLE IF NOT EXISTS project_tasks (
+  id VARCHAR(80) PRIMARY KEY,
+  project_id VARCHAR(60) NOT NULL,
+  title VARCHAR(220) NOT NULL,
+  description TEXT NULL,
+  assigned_to_id VARCHAR(80) NULL,
+  assigned_to_name VARCHAR(180) NULL,
+  status VARCHAR(40) NOT NULL DEFAULT 'pending',
+  deadline DATE NULL,
+  contribution_percent INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_project_tasks_project (project_id)
+);
+
+CREATE TABLE IF NOT EXISTS project_files (
+  id VARCHAR(80) PRIMARY KEY,
+  project_id VARCHAR(60) NOT NULL,
+  file_name VARCHAR(260) NOT NULL,
+  file_size BIGINT NOT NULL DEFAULT 0,
+  file_type VARCHAR(60) NULL,
+  mime_type VARCHAR(120) NULL,
+  uploaded_by VARCHAR(80) NULL,
+  uploaded_by_name VARCHAR(180) NULL,
+  uploaded_date DATE NULL,
+  version INT NOT NULL DEFAULT 1,
+  description TEXT NULL,
+  download_count INT NOT NULL DEFAULT 0,
+  is_submitted TINYINT(1) NOT NULL DEFAULT 0,
+  submitted_date DATE NULL,
+  updated_date DATE NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_project_files_project (project_id)
+);
+
+CREATE TABLE IF NOT EXISTS project_feedback_corrections (
+  id VARCHAR(80) PRIMARY KEY,
+  project_id VARCHAR(60) NOT NULL,
+  student_identifier VARCHAR(80) NULL,
+  note TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_project_feedback_project (project_id)
+);
