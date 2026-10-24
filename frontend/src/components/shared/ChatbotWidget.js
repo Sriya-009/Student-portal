@@ -1,15 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { sendChatMessage } from '../../services/chatService';
+import { getPredefinedChatAnswer, topics } from '../../services/chatKnowledge';
 import './ChatbotWidget.css';
-
-const suggestions = [
-  'How do I use the Student Portal?',
-  'How can I submit an assignment?',
-  'How do I check project updates?',
-  'How can I view feedback?',
-  'How do I update my profile?'
-];
 
 function ChatbotWidget() {
   const { user } = useAuth();
@@ -18,50 +10,29 @@ function ChatbotWidget() {
   const [messages, setMessages] = useState([
     { role: 'assistant', content: 'Hi! I can provide general guidance about using the Student Portal.' }
   ]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [retryMessage, setRetryMessage] = useState('');
 
   if (!user) {
     return null;
   }
 
-  const sendContent = async (content) => {
-    if (!content || loading) {
+  const sendContent = (content) => {
+    if (!content) {
       return;
     }
 
-    setError('');
     setInput('');
-    const nextMessages = [...messages, { role: 'user', content }];
-    setMessages(nextMessages);
-    setLoading(true);
-
-    try {
-      const response = await sendChatMessage(content, nextMessages);
-      setMessages((current) => [...current, { role: 'assistant', content: response }]);
-      setRetryMessage('');
-    } catch (requestError) {
-      setError(requestError.message || 'Unable to contact the assistant.');
-      setRetryMessage(content);
-    } finally {
-      setLoading(false);
-    }
+    setMessages((current) => [
+      ...current,
+      { role: 'user', content },
+      { role: 'assistant', content: getPredefinedChatAnswer(content) }
+    ]);
   };
 
   const submitMessage = async (event) => {
     event?.preventDefault();
     const content = input.trim();
     setInput('');
-    await sendContent(content);
-  };
-
-  const retryLastMessage = async () => {
-    if (!retryMessage || loading) {
-      return;
-    }
-    setError('');
-    await sendContent(retryMessage);
+    sendContent(content);
   };
 
   const handleKeyDown = (event) => {
@@ -89,21 +60,11 @@ function ChatbotWidget() {
             ))}
             {!messages.some((item) => item.role === 'user') ? (
               <div className="chatbot-suggestions">
-                {suggestions.map((suggestion) => (
-                  <button type="button" key={suggestion} onClick={() => setInput(suggestion)}>
-                    {suggestion}
+                {topics.map(({ question }) => (
+                  <button type="button" key={question} onClick={() => sendContent(question)}>
+                    {question}
                   </button>
                 ))}
-              </div>
-            ) : null}
-            {loading ? <p className="chatbot-status">Thinking…</p> : null}
-            {error ? (
-              <div className="chatbot-error">
-                <span>{error}</span>
-                <span>
-                  {retryMessage ? <button type="button" onClick={retryLastMessage}>Retry</button> : null}
-                  <button type="button" onClick={() => setError('')}>Dismiss</button>
-                </span>
               </div>
             ) : null}
           </div>
@@ -115,14 +76,13 @@ function ChatbotWidget() {
               placeholder="Ask about the portal..."
               rows={2}
               maxLength={2000}
-              disabled={loading}
               aria-label="Chat message"
             />
             <div className="chatbot-actions">
               <button type="button" onClick={() => setMessages([{ role: 'assistant', content: 'Chat cleared. How can I help?' }])}>
                 Clear
               </button>
-              <button type="submit" disabled={loading || !input.trim()}>Send</button>
+              <button type="submit" disabled={!input.trim()}>Send</button>
             </div>
           </form>
         </section>

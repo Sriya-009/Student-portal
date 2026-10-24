@@ -1,92 +1,60 @@
-const CHAT_SYSTEM_PROMPT = [
-  'You are the Student Portal guidance assistant.',
-  'Answer questions about using the portal clearly and briefly.',
-  'Use only general guidance from the supplied conversation; do not invent portal features or policies.',
-  'Do not claim to submit assignments, change records, access private data, or perform actions.',
-  'Refuse requests for unauthorized private data and direct the user to the appropriate portal role or administrator.'
-].join(' ');
+const unsupportedAnswer = 'Sorry, I can only answer questions about the available Student Portal topics. Please choose one of the suggested questions.';
 
-function getChatConfig() {
-  return {
-    apiKey: String(process.env.AI_API_KEY || '').trim(),
-    model: String(process.env.AI_MODEL || '').trim(),
-    baseUrl: String(process.env.AI_API_BASE_URL || '').trim()
-  };
+const topics = [
+  {
+    question: 'How can I view feedback?',
+    answer: 'Open the project workspace on your dashboard and choose the feedback or corrections option for the selected project.',
+    keywords: ['feedback', 'comments', 'mentor feedback']
+  },
+  {
+    question: 'How do I check project updates?',
+    answer: 'Open your dashboard to review projects and use the project workspace to view tasks, files, progress, and submission status.',
+    keywords: ['project update', 'project progress', 'project status', 'project']
+  },
+  {
+    question: 'How can I view assignments?',
+    answer: 'Students can view project tasks and assignments from the project workspace. Faculty can create and manage assignments from Assign Tasks.',
+    keywords: ['assignment', 'assignments', 'task', 'tasks']
+  },
+  {
+    question: 'How do I check my attendance?',
+    answer: 'Attendance tracking is not currently available as a Student Portal page or API feature. Please contact your faculty for attendance information.',
+    keywords: ['attendance', 'absent', 'presence']
+  },
+  {
+    question: 'How can I view my grades?',
+    answer: 'Students can check project grades from the feedback and grades option in the project workspace. Faculty manage grading from Feedback & Evaluation.',
+    keywords: ['grade', 'grades', 'marks', 'score']
+  },
+  {
+    question: 'How do I update my profile?',
+    answer: 'Use your role-specific Profile page to edit profile details and manage a profile photo. Students use Student Profile, faculty use Faculty Profile, and admins use Admin Profile.',
+    keywords: ['profile', 'photo', 'personal details']
+  },
+  {
+    question: 'How can I contact faculty?',
+    answer: 'Use the portal communication or faculty coordination features to contact faculty. The portal does not let the assistant send messages for you.',
+    keywords: ['contact faculty', 'faculty', 'mentor', 'teacher']
+  },
+  {
+    question: 'What should I do if I cannot log in?',
+    answer: 'Check your identifier and password, then try the Login page again. If needed, use the password-reset option. Contact an administrator if your account is inactive or delivery services are unavailable.',
+    keywords: ['cannot log in', 'cant log in', 'can not log in', 'login', 'log in', 'password']
+  }
+];
+
+function normalizeText(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-function validateHistory(history) {
-  if (!Array.isArray(history)) {
-    return [];
+function getPredefinedChatAnswer(message) {
+  const normalized = normalizeText(message);
+  if (!normalized) {
+    return unsupportedAnswer;
   }
 
-  const recentHistory = history.slice(-8);
-  const isValid = recentHistory.every((item) => item
-    && ['user', 'assistant'].includes(item.role)
-    && typeof item.content === 'string'
-    && item.content.trim()
-    && item.content.length <= 4000);
-  if (!isValid) {
-    const error = new Error('Invalid chat history.');
-    error.code = 'INVALID_CHAT_HISTORY';
-    throw error;
-  }
-  return recentHistory.map((item) => ({ role: item.role, content: item.content.trim() }));
+  const topic = topics.find(({ keywords }) => keywords.some((keyword) => normalized.includes(normalizeText(keyword))));
+  return topic ? topic.answer : unsupportedAnswer;
 }
 
-async function requestChatCompletion(message, history = []) {
-  const normalizedHistory = validateHistory(history);
-  const config = getChatConfig();
-  if (!config.apiKey || !config.model || !config.baseUrl) {
-    const error = new Error('AI assistant is not configured yet.');
-    error.code = 'AI_NOT_CONFIGURED';
-    throw error;
-  }
-
-  let endpoint;
-  try {
-    endpoint = new URL(config.baseUrl);
-  } catch (_error) {
-    const error = new Error('AI assistant is not configured yet.');
-    error.code = 'AI_NOT_CONFIGURED';
-    throw error;
-  }
-
-  if (!['http:', 'https:'].includes(endpoint.protocol)) {
-    const error = new Error('AI assistant is not configured yet.');
-    error.code = 'AI_NOT_CONFIGURED';
-    throw error;
-  }
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiKey}`
-    },
-    body: JSON.stringify({
-      model: config.model,
-      messages: [
-        { role: 'system', content: CHAT_SYSTEM_PROMPT },
-        ...normalizedHistory,
-        { role: 'user', content: message }
-      ],
-      temperature: 0.2,
-      max_tokens: 400
-    }),
-    signal: AbortSignal.timeout(30000)
-  });
-
-  if (!response.ok) {
-    throw new Error(`AI provider returned status ${response.status}.`);
-  }
-
-  const payload = await response.json();
-  const content = payload?.choices?.[0]?.message?.content;
-  if (typeof content !== 'string' || !content.trim()) {
-    throw new Error('AI provider returned an invalid response.');
-  }
-
-  return content.trim();
-}
-
-module.exports = { requestChatCompletion, validateHistory };
+module.exports = { getPredefinedChatAnswer, normalizeText, unsupportedAnswer };

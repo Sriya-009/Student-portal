@@ -86,7 +86,7 @@ Staff OTPs and password-reset tokens are never returned by the API. Configure th
 - **CORS error:** add the exact frontend origin to `CORS_ORIGINS`.
 - **Faculty/admin OTP unavailable:** configure and verify the OTP delivery webhook and provider credentials.
 - **Upload rejected:** profile photos must be JPEG, PNG, GIF, or WebP and no larger than 5 MB.
-- **Assistant unavailable:** configure `AI_API_KEY`, `AI_MODEL`, and an OpenAI-compatible `AI_API_BASE_URL` in `backend\.env`. The key remains server-side; no real provider is bundled or called by tests.
+- **Portal Assistant:** provides fixed Student Portal guidance for the predefined topics and does not require an AI provider or external API credentials.
 
 ## Production requirements
 
