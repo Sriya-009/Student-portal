@@ -40,6 +40,11 @@ const topics = [
     keywords: ['profile', 'update profile', 'edit profile', 'photo', 'personal details']
   },
   {
+    question: 'How do I logout?',
+    answer: 'Click the Logout button on the right side of the top navigation bar, next to your profile and role.',
+    keywords: ['logout', 'log out', 'sign out', 'logout button', 'signout']
+  },
+  {
     question: 'How can I contact faculty?',
     answer: 'Use the portal communication or faculty coordination features to contact faculty. The portal does not let the assistant send messages for you.',
     keywords: ['contact faculty', 'message faculty', 'faculty', 'mentor', 'teacher']
