@@ -274,6 +274,21 @@ app.post('/api/chat', requireRoles('student', 'faculty', 'admin'), chatRateLimit
     if (error.code === 'AI_RATE_LIMITED') {
       return res.status(429).json({ ok: false, error: 'The assistant usage limit has been reached. Please try again later.' });
     }
+    if (error.code === 'AI_INVALID_REQUEST') {
+      return res.status(502).json({ ok: false, error: 'The assistant request was rejected by the provider.' });
+    }
+    if (error.code === 'AI_INVALID_API_KEY') {
+      return res.status(502).json({ ok: false, error: 'The assistant provider authentication is invalid.' });
+    }
+    if (error.code === 'AI_FORBIDDEN') {
+      return res.status(502).json({ ok: false, error: 'The assistant provider denied this request.' });
+    }
+    if (error.code === 'AI_MODEL_OR_ENDPOINT_NOT_FOUND') {
+      return res.status(502).json({ ok: false, error: 'The assistant model or endpoint was not found.' });
+    }
+    if (error.code === 'AI_PROVIDER_UNAVAILABLE') {
+      return res.status(502).json({ ok: false, error: 'The assistant provider is temporarily unavailable.' });
+    }
     console.error('Chat provider request failed:', error.message);
     return res.status(502).json({ ok: false, error: 'The assistant is temporarily unavailable.' });
   }

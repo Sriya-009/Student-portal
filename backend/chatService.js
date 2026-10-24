@@ -6,9 +6,48 @@ const SYSTEM_PROMPT = [
   'When portal-specific details are uncertain, say so and direct the user to the relevant faculty or administrator.'
 ].join(' ');
 
-const DEFAULT_TIMEOUT_MS = 10000;
+const DEFAULT_TIMEOUT_MS = 60000;
 const MAX_HISTORY_MESSAGES = 10;
 const MAX_MESSAGE_LENGTH = 2000;
+
+function sanitizeProviderMessage(value, apiKey) {
+  return String(value || 'Provider returned an error.')
+    .replace(new RegExp(apiKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '[REDACTED]')
+    .replace(/bearer\s+[^\s]+/gi, 'Bearer [REDACTED]')
+    .replace(/(api[-_ ]?key|token|authorization)\s*[:=]\s*[^\s,;]+/gi, '$1=[REDACTED]')
+    .replace(/\s+/g, ' ')
+    .slice(0, 300);
+}
+
+function getProviderErrorMessage(payload, response) {
+  return payload?.error?.message
+    || payload?.error
+    || payload?.message
+    || response.statusText
+    || 'Provider returned an error.';
+}
+
+function createProviderError(status, message) {
+  const error = new Error(`AI provider returned HTTP ${status}.`);
+  error.status = status;
+  if (status === 400) {
+    error.code = 'AI_INVALID_REQUEST';
+  } else if (status === 401) {
+    error.code = 'AI_INVALID_API_KEY';
+  } else if (status === 403) {
+    error.code = 'AI_FORBIDDEN';
+  } else if (status === 404) {
+    error.code = 'AI_MODEL_OR_ENDPOINT_NOT_FOUND';
+  } else if (status === 429) {
+    error.code = 'AI_RATE_LIMITED';
+  } else if (status >= 500 && status <= 599) {
+    error.code = 'AI_PROVIDER_UNAVAILABLE';
+  } else {
+    error.code = 'AI_PROVIDER_ERROR';
+  }
+  error.providerMessage = message;
+  return error;
+}
 
 function getProviderConfig() {
   const apiKey = String(process.env.AI_API_KEY || '').trim();
@@ -81,14 +120,10 @@ async function requestChatCompletion(message, history = []) {
       signal: controller.signal
     });
     const payload = await response.json().catch(() => ({}));
-    if (response.status === 429) {
-      const error = new Error('AI provider usage limit reached.');
-      error.code = 'AI_RATE_LIMITED';
-      throw error;
-    }
     if (!response.ok) {
-      const error = new Error('AI provider request failed.');
-      error.code = 'AI_PROVIDER_ERROR';
+      const providerMessage = sanitizeProviderMessage(getProviderErrorMessage(payload, response), apiKey);
+      const error = createProviderError(response.status, providerMessage);
+      console.error(`Gemini provider HTTP ${response.status}: ${providerMessage}`);
       throw error;
     }
     const content = payload?.choices?.[0]?.message?.content;

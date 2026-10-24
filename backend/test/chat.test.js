@@ -74,12 +74,33 @@ test('sends recent conversation history to the configured Gemini-compatible endp
   }
 });
 
-test('returns safe errors for provider failures, usage limits, and timeouts', async () => {
+test('classifies provider request, authentication, model, quota, and server errors safely', async () => {
   const originalFetch = global.fetch;
   try {
+    global.fetch = async () => ({ ok: false, status: 400, statusText: 'Bad Request', json: async () => ({ error: { message: 'Invalid model' } }) });
+    const invalidModel = await request(app).post('/api/chat').set('Authorization', authorization()).send({ message: 'Hello' });
+    assert.equal(invalidModel.status, 502);
+    assert.equal(invalidModel.body.error, 'The assistant request was rejected by the provider.');
+
+    global.fetch = async () => ({ ok: false, status: 401, statusText: 'Unauthorized', json: async () => ({ error: { message: 'Invalid API key' } }) });
+    const invalidKey = await request(app).post('/api/chat').set('Authorization', authorization()).send({ message: 'Hello' });
+    assert.equal(invalidKey.status, 502);
+    assert.equal(invalidKey.body.error, 'The assistant provider authentication is invalid.');
+
+    global.fetch = async () => ({ ok: false, status: 403, statusText: 'Forbidden', json: async () => ({ error: { message: 'Project is not permitted' } }) });
+    const forbidden = await request(app).post('/api/chat').set('Authorization', authorization()).send({ message: 'Hello' });
+    assert.equal(forbidden.status, 502);
+    assert.equal(forbidden.body.error, 'The assistant provider denied this request.');
+
+    global.fetch = async () => ({ ok: false, status: 404, statusText: 'Not Found', json: async () => ({ error: { message: 'Model not found' } }) });
+    const invalidModelEndpoint = await request(app).post('/api/chat').set('Authorization', authorization()).send({ message: 'Hello' });
+    assert.equal(invalidModelEndpoint.status, 502);
+    assert.equal(invalidModelEndpoint.body.error, 'The assistant model or endpoint was not found.');
+
     global.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
     const failure = await request(app).post('/api/chat').set('Authorization', authorization()).send({ message: 'Hello' });
     assert.equal(failure.status, 502);
+    assert.equal(failure.body.error, 'The assistant provider is temporarily unavailable.');
 
     global.fetch = async () => ({ ok: false, status: 429, json: async () => ({}) });
     const limited = await request(app).post('/api/chat').set('Authorization', authorization()).send({ message: 'Hello' });
