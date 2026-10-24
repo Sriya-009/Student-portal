@@ -129,8 +129,12 @@ const chatRateLimiter = rateLimit({
 
 // ========== FILE UPLOAD CONFIG ==========
 const uploadsDir = path.join(__dirname, 'uploads', 'profile-photos');
+const projectFilesDir = path.join(__dirname, 'uploads', 'project-files');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
+}
+if (!fs.existsSync(projectFilesDir)) {
+  fs.mkdirSync(projectFilesDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
@@ -156,6 +160,14 @@ const uploadMiddleware = multer({
   storage,
   fileFilter,
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+const projectFileUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, projectFilesDir),
+    filename: (req, _file, cb) => cb(null, path.basename(String(req.params.fileId || '')))
+  }),
+  limits: { fileSize: 50 * 1024 * 1024 }
 });
 
 function safeUnlink(filePath) {
@@ -364,6 +376,7 @@ async function deliverWebhookMessage({ url, apiKey, event, recipient, code, expi
   try {
     providerUrl = new URL(String(url || ''));
   } catch (_error) {
+    console.error(`Webhook delivery unavailable for ${event || 'unknown event'}: provider URL is missing or invalid.`);
     return false;
   }
 
@@ -373,6 +386,7 @@ async function deliverWebhookMessage({ url, apiKey, event, recipient, code, expi
     || !String(recipient || '').trim()
     || !String(code || '').trim()
     || !Number.isFinite(Number(expiresAt))) {
+    console.error(`Webhook delivery unavailable for ${event || 'unknown event'}: provider configuration is incomplete.`);
     return false;
   }
 
@@ -1355,6 +1369,57 @@ app.get('/api/projects/:projectId/files', async (req, res) => {
   }
 });
 
+app.post('/api/projects/:projectId/files/:fileId/content', requireRoles('student', 'faculty', 'admin'), projectFileUpload.single('file'), async (req, res) => {
+  const projectId = String(req.params.projectId || '').trim();
+  const fileId = String(req.params.fileId || '').trim();
+  if (!projectId || !fileId || !req.file) {
+    if (req.file?.path) safeUnlink(req.file.path);
+    return res.status(400).json({ ok: false, error: 'projectId, fileId, and file are required.' });
+  }
+
+  try {
+    const pool = getPool();
+    if (!await canAccessProject(pool, req, projectId)) {
+      safeUnlink(req.file.path);
+      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
+    }
+    return res.json({ ok: true });
+  } catch (error) {
+    safeUnlink(req.file.path);
+    return sendServerError(res, error);
+  }
+});
+
+app.get('/api/projects/:projectId/files/:fileId/content', async (req, res) => {
+  const projectId = String(req.params.projectId || '').trim();
+  const fileId = String(req.params.fileId || '').trim();
+  try {
+    const pool = getPool();
+    if (!await canAccessProject(pool, req, projectId)) {
+      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
+    }
+    const [rows] = await pool.query(
+      'SELECT file_name, mime_type FROM project_files WHERE project_id = ? AND id = ? LIMIT 1',
+      [projectId, fileId]
+    );
+    if (!rows.length) {
+      return res.status(404).json({ ok: false, error: 'File metadata was not found.' });
+    }
+    const filePath = path.join(projectFilesDir, fileId);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ ok: false, error: 'File content is not available.' });
+    }
+    await pool.query(
+      'UPDATE project_files SET download_count = download_count + 1 WHERE project_id = ? AND id = ?',
+      [projectId, fileId]
+    );
+    res.type(rows[0].mime_type || 'application/octet-stream');
+    return res.download(filePath, path.basename(rows[0].file_name));
+  } catch (error) {
+    return sendServerError(res, error);
+  }
+});
+
 app.put('/api/projects/:projectId/files', requireRoles('student', 'faculty', 'admin'), async (req, res) => {
   const projectId = String(req.params.projectId || '').trim();
   const files = Array.isArray(req.body?.files) ? req.body.files : null;
@@ -2210,6 +2275,7 @@ module.exports = {
     otpSessions,
     passwordResetTokens,
     takePasswordResetToken,
-    deliverWebhookMessage
+    deliverWebhookMessage,
+    deliverOtp
   }
 };

@@ -85,6 +85,65 @@ test('rejects invalid webhook configuration without making a request', async () 
   assert.equal(result, false);
 });
 
+test('delivers faculty OTP through the configured provider without exposing the OTP', async () => {
+  const originalFetch = global.fetch;
+  const originalDelivery = process.env.OTP_DELIVERY;
+  const originalUrl = process.env.OTP_PROVIDER_URL;
+  const originalKey = process.env.OTP_PROVIDER_API_KEY;
+  let requestBody;
+
+  process.env.OTP_DELIVERY = 'webhook';
+  process.env.OTP_PROVIDER_URL = 'https://otp-provider.test/send';
+  process.env.OTP_PROVIDER_API_KEY = 'test-provider-key';
+  global.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return { ok: true };
+  };
+
+  try {
+    const result = await __test.deliverOtp(
+      { role: 'faculty', identifier: 'FAC001', email: 'faculty@test.local' },
+      '123456',
+      Date.now() + 300000
+    );
+    assert.equal(result, true);
+    assert.equal(requestBody.event, 'student-portal.otp');
+    assert.equal(requestBody.recipient, 'faculty@test.local');
+    assert.equal(requestBody.code, '123456');
+  } finally {
+    global.fetch = originalFetch;
+    process.env.OTP_DELIVERY = originalDelivery;
+    process.env.OTP_PROVIDER_URL = originalUrl;
+    process.env.OTP_PROVIDER_API_KEY = originalKey;
+  }
+});
+
+test('reports unavailable MFA delivery when the provider is not configured or fails', async () => {
+  const originalFetch = global.fetch;
+  const originalDelivery = process.env.OTP_DELIVERY;
+  const originalUrl = process.env.OTP_PROVIDER_URL;
+  const originalKey = process.env.OTP_PROVIDER_API_KEY;
+  delete process.env.OTP_DELIVERY;
+  delete process.env.OTP_PROVIDER_URL;
+  delete process.env.OTP_PROVIDER_API_KEY;
+
+  try {
+    assert.equal(await __test.deliverOtp({ email: 'faculty@test.local' }, '123456', Date.now() + 300000), false);
+    process.env.OTP_DELIVERY = 'webhook';
+    process.env.OTP_PROVIDER_URL = 'https://otp-provider.test/send';
+    process.env.OTP_PROVIDER_API_KEY = 'test-provider-key';
+    global.fetch = async () => {
+      throw new Error('provider unavailable');
+    };
+    assert.equal(await __test.deliverOtp({ email: 'faculty@test.local' }, '123456', Date.now() + 300000), false);
+  } finally {
+    global.fetch = originalFetch;
+    process.env.OTP_DELIVERY = originalDelivery;
+    process.env.OTP_PROVIDER_URL = originalUrl;
+    process.env.OTP_PROVIDER_API_KEY = originalKey;
+  }
+});
+
 test('requires authentication for protected routes with missing and invalid tokens', async () => {
   const missing = await request(app).get('/api/users');
   const invalid = await request(app)

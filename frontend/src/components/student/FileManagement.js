@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { downloadProjectFile, uploadProjectFile } from '../../services/authService';
 
 function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, projectFiles, onFilesUpdate, projectName, actionMode }) {
   const [files, setFiles] = useState(projectFiles || []);
@@ -41,6 +42,7 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
     const file = e.target.files[0];
     if (file) {
       setUploadedFile({
+        file,
         name: file.name,
         size: file.size,
         type: file.type
@@ -48,7 +50,7 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
     }
   };
 
-  const handleUploadFile = (e) => {
+  const handleUploadFile = async (e) => {
     e.preventDefault();
     if (!uploadedFile || !fileVersion.trim()) {
       alert('Please select a file and enter a description');
@@ -71,12 +73,17 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
       isSubmitted: false
     };
 
-    const updatedFiles = [...files, newFile];
-    setFiles(updatedFiles);
-    onFilesUpdate?.(updatedFiles);
-    setUploadedFile(null);
-    setFileVersion('');
-    setShowUploadForm(false);
+    try {
+      await uploadProjectFile(projectId, newFile.id, uploadedFile.file);
+      const updatedFiles = [...files, newFile];
+      setFiles(updatedFiles);
+      onFilesUpdate?.(updatedFiles);
+      setUploadedFile(null);
+      setFileVersion('');
+      setShowUploadForm(false);
+    } catch (error) {
+      alert(error.message || 'Unable to upload file.');
+    }
   };
 
   const handleFinalSubmission = () => {
@@ -100,13 +107,18 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
     }
   };
 
-  const handleDownloadFile = (file) => {
-    const updatedFiles = files.map((f) =>
-      f.id === file.id ? { ...f, downloadCount: f.downloadCount + 1 } : f
-    );
-    setFiles(updatedFiles);
-    onFilesUpdate?.(updatedFiles);
-    alert(`Downloaded: ${file.fileName}`);
+  const handleDownloadFile = async (file) => {
+    try {
+      await downloadProjectFile(projectId, file.id, file.fileName);
+      const updatedFiles = files.map((f) =>
+        f.id === file.id ? { ...f, downloadCount: f.downloadCount + 1 } : f
+      );
+      setFiles(updatedFiles);
+      onFilesUpdate?.(updatedFiles);
+      alert(`Downloaded: ${file.fileName}`);
+    } catch (error) {
+      alert(error.message || 'Unable to download file.');
+    }
   };
 
   const handleStartEditFile = (file) => {

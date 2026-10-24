@@ -339,6 +339,33 @@ export async function saveProjectFiles(projectId, files) {
   return payload.files || [];
 }
 
+export async function uploadProjectFile(projectId, fileId, file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await authFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/content`, {
+    method: 'POST',
+    body: formData
+  });
+  await parseResponse(response);
+}
+
+export async function downloadProjectFile(projectId, fileId, fileName) {
+  const response = await authFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}/content`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.error || 'Unable to download file.');
+  }
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
 export async function getProjectFeedbackCorrections(projectId) {
   const response = await authFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/feedback-corrections`);
   const payload = await parseResponse(response);
