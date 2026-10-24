@@ -58,15 +58,13 @@ function ChatbotWidget() {
                 {item.content}
               </p>
             ))}
-            {!messages.some((item) => item.role === 'user') ? (
-              <div className="chatbot-suggestions">
-                {topics.map(({ question }) => (
-                  <button type="button" key={question} onClick={() => sendContent(question)}>
-                    {question}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+            <div className="chatbot-suggestions">
+              {topics.filter(({ question }) => question).map(({ question }) => (
+                <button type="button" key={question} onClick={() => sendContent(question)}>
+                  {question}
+                </button>
+              ))}
+            </div>
           </div>
           <form className="chatbot-form" onSubmit={submitMessage}>
             <textarea
