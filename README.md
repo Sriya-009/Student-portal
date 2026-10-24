@@ -86,7 +86,7 @@ Staff OTPs and password-reset tokens are never returned by the API. Configure th
 - **CORS error:** add the exact frontend origin to `CORS_ORIGINS`.
 - **Faculty/admin OTP unavailable:** configure and verify the OTP delivery webhook and provider credentials.
 - **Upload rejected:** profile photos must be JPEG, PNG, GIF, or WebP and no larger than 5 MB.
-- **Portal Assistant:** provides fixed Student Portal guidance for the predefined topics and does not require an AI provider or external API credentials.
+- **Portal Assistant:** uses the server-side Gemini OpenAI-compatible chat-completions endpoint. Configure `AI_API_KEY`, `AI_MODEL`, `AI_API_BASE_URL`, and optionally `AI_TIMEOUT_MS` in `backend\.env`; never expose the key to the frontend.
 
 ## Production requirements
 

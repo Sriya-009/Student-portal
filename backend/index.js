@@ -11,7 +11,7 @@ const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { getPool, testConnection } = require('./db');
-const { getPredefinedChatAnswer } = require('./chatService');
+const { requestChatCompletion } = require('./chatService');
 
 const app = express();
 // Render places the app behind one reverse proxy; trust only that hop for client IPs.
@@ -239,15 +239,31 @@ app.post('/api/chat', requireRoles('student', 'faculty', 'admin'), chatRateLimit
   if (typeof message !== 'string' || !message.trim() || message.length > 2000) {
     return res.status(400).json({ ok: false, error: 'message must be a non-empty string under 2000 characters.' });
   }
+  if (history !== undefined && !Array.isArray(history)) {
+    return res.status(400).json({ ok: false, error: 'history must be an array.' });
+  }
   if (JSON.stringify({ message, history }).length > 32000) {
     return res.status(413).json({ ok: false, error: 'Chat request is too large.' });
   }
 
   try {
-    return res.json({ ok: true, message: getPredefinedChatAnswer(message) });
+    const response = await requestChatCompletion(message.trim(), history);
+    return res.json({ ok: true, message: response });
   } catch (error) {
-    console.error('Chat answer failed:', error.message);
-    return res.status(500).json({ ok: false, error: 'The assistant is temporarily unavailable.' });
+    if (error.code === 'INVALID_CHAT_HISTORY') {
+      return res.status(400).json({ ok: false, error: 'history contains invalid messages.' });
+    }
+    if (error.code === 'AI_NOT_CONFIGURED') {
+      return res.status(503).json({ ok: false, error: 'The assistant is not configured yet.' });
+    }
+    if (error.code === 'AI_TIMEOUT') {
+      return res.status(504).json({ ok: false, error: 'The assistant took too long to respond. Please try again.' });
+    }
+    if (error.code === 'AI_RATE_LIMITED') {
+      return res.status(429).json({ ok: false, error: 'The assistant usage limit has been reached. Please try again later.' });
+    }
+    console.error('Chat provider request failed:', error.message);
+    return res.status(502).json({ ok: false, error: 'The assistant is temporarily unavailable.' });
   }
 });
 

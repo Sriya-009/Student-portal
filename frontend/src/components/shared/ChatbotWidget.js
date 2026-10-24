@@ -1,38 +1,68 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getPredefinedChatAnswer, topics } from '../../services/chatKnowledge';
+import { sendChatMessage } from '../../services/chatService';
 import './ChatbotWidget.css';
+
+const suggestions = [
+  'How do I use the Student Achievement Portal?',
+  'How can I submit an assignment?',
+  'How do I check project updates?',
+  'How can I view feedback?',
+  'How do I update my profile?'
+];
 
 function ChatbotWidget() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: 'Hi! I can provide general guidance about using the Student Portal.' }
+    { role: 'assistant', content: 'Hi! I can help answer questions about the Student Achievement Portal.' }
   ]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [retryMessage, setRetryMessage] = useState('');
 
   if (!user) {
     return null;
   }
 
-  const sendContent = (content) => {
-    if (!content) {
+  const requestAnswer = async (content, history) => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await sendChatMessage(content, history);
+      setMessages((current) => [...current, { role: 'assistant', content: response }]);
+      setRetryMessage('');
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to contact the assistant.');
+      setRetryMessage(content);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendContent = async (content) => {
+    const trimmedContent = content.trim();
+    if (!trimmedContent || loading) {
       return;
     }
 
     setInput('');
-    setMessages((current) => [
-      ...current,
-      { role: 'user', content },
-      { role: 'assistant', content: getPredefinedChatAnswer(content) }
-    ]);
+    const history = messages;
+    setMessages((current) => [...current, { role: 'user', content: trimmedContent }]);
+    await requestAnswer(trimmedContent, history);
   };
 
   const submitMessage = async (event) => {
     event?.preventDefault();
-    const content = input.trim();
-    setInput('');
-    sendContent(content);
+    await sendContent(input);
+  };
+
+  const retryLastMessage = async () => {
+    if (!retryMessage || loading) {
+      return;
+    }
+    await requestAnswer(retryMessage, messages);
   };
 
   const handleKeyDown = (event) => {
@@ -59,28 +89,39 @@ function ChatbotWidget() {
               </p>
             ))}
             <div className="chatbot-suggestions">
-              {topics.filter(({ question }) => question).map(({ question }) => (
-                <button type="button" key={question} onClick={() => sendContent(question)}>
-                  {question}
+              {suggestions.map((suggestion) => (
+                <button type="button" key={suggestion} onClick={() => sendContent(suggestion)} disabled={loading}>
+                  {suggestion}
                 </button>
               ))}
             </div>
+            {loading ? <p className="chatbot-status">Thinking…</p> : null}
+            {error ? (
+              <div className="chatbot-error">
+                <span>{error}</span>
+                <span>
+                  {retryMessage ? <button type="button" onClick={retryLastMessage}>Retry</button> : null}
+                  <button type="button" onClick={() => setError('')}>Dismiss</button>
+                </span>
+              </div>
+            ) : null}
           </div>
           <form className="chatbot-form" onSubmit={submitMessage}>
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about the portal..."
+              placeholder="Ask anything about the portal..."
               rows={2}
               maxLength={2000}
+              disabled={loading}
               aria-label="Chat message"
             />
             <div className="chatbot-actions">
               <button type="button" onClick={() => setMessages([{ role: 'assistant', content: 'Chat cleared. How can I help?' }])}>
                 Clear
               </button>
-              <button type="submit" disabled={!input.trim()}>Send</button>
+              <button type="submit" disabled={loading || !input.trim()}>Send</button>
             </div>
           </form>
         </section>
