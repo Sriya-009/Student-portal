@@ -14,6 +14,8 @@ const { getPool, testConnection } = require('./db');
 const { requestChatCompletion } = require('./chatService');
 
 const app = express();
+// Render places the app behind one reverse proxy; trust only that hop for client IPs.
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '1h';
