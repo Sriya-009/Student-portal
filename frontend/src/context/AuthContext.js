@@ -1,5 +1,6 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import {
+  AUTH_EXPIRED_EVENT,
   loginUser,
   signupUser,
   verifyStaffOtp,
@@ -16,10 +17,14 @@ function readStoredSession() {
     const session = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
     if (session?.token) {
       sessionStorage.setItem('student-portal-token', session.token);
+      return session;
     }
-    return session;
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem('student-portal-token');
+    return null;
   } catch (_error) {
     sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem('student-portal-token');
     return null;
   }
 }
@@ -27,12 +32,23 @@ function readStoredSession() {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(readStoredSession);
 
+  useEffect(() => {
+    const expireSession = () => {
+      sessionStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem('student-portal-token');
+      setUser(null);
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, expireSession);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, expireSession);
+  }, []);
+
   const storeUser = (nextUser) => {
     setUser(nextUser);
     if (nextUser?.token) {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(nextUser));
       sessionStorage.setItem('student-portal-token', nextUser.token);
     } else {
+      sessionStorage.removeItem(SESSION_KEY);
       sessionStorage.removeItem('student-portal-token');
     }
   };

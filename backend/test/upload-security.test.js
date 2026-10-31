@@ -5,7 +5,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
-const { app } = require('../index');
+const { app, __test } = require('../index');
+
+__test.setAuthIdentityProvider(async (identifier) => (
+  String(identifier).toLowerCase() === 'stu001'
+    ? { identifier: 'STU001', role: 'student', is_active: 1 }
+    : null
+));
 
 function authorization() {
   const token = jwt.sign(
@@ -42,6 +48,6 @@ test('rejects oversized profile-photo uploads', async () => {
     .set('Authorization', authorization())
     .attach('profilePhoto', oversizedFile, 'profile.png');
 
-  assert.equal(response.status, 400);
+  assert.equal(response.status, 413);
   assert.match(response.body.error, /File too large/i);
 });

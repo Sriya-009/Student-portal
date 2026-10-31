@@ -5,9 +5,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
-const { app } = require('../index');
+const { app, __test } = require('../index');
+
+const testIdentities = new Map();
+__test.setAuthIdentityProvider(async (identifier) => testIdentities.get(String(identifier).toLowerCase()) || null);
 
 function token(identifier, role) {
+  testIdentities.set(identifier.toLowerCase(), { identifier, role, is_active: 1 });
   return jwt.sign(
     { sub: identifier, role, email: `${identifier}@test.local`, type: 'access' },
     process.env.JWT_SECRET,

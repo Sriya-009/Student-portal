@@ -3917,3 +3917,167 @@ body.dark-mode .pill.badge {
   color: #059669;
   margin: 2px 0 0 0;
 }
+
+/* Shared workspace refinements */
+.portal-layout {
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+}
+
+.portal-sidebar,
+.portal-main,
+.portal-main > *,
+.portal-sidebar > * {
+  min-width: 0;
+}
+
+.topbar-name {
+  font-size: clamp(1.125rem, 2vw, 1.5rem);
+  line-height: 1.25;
+}
+
+.topbar-meta {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.portal-shell .outline-btn,
+.portal-shell .primary-dark-btn,
+.portal-shell .icon-btn,
+.portal-shell .danger-ghost {
+  min-height: 40px;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.portal-shell .icon-btn {
+  min-width: 40px;
+}
+
+.sidebar-action {
+  padding: 0.7rem 0.8rem;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.page-head h1 {
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  line-height: 1.2;
+}
+
+.page-head p {
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.stat-card h4 {
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+.stat-card p {
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.stat-card .value-primary,
+.stat-card .value-success {
+  margin-block-start: 1rem;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+.admin-table-wrapper,
+.student-table-wrapper,
+.table-responsive,
+.grades-table {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.portal-shell :focus-visible,
+.workspace-sidebar :focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.upload-status {
+  margin: 0.75rem 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 1200px) {
+  .portal-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .portal-topbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .portal-sidebar {
+    display: block;
+    max-height: 45vh;
+    overflow: auto;
+    border-inline-end: 0;
+  }
+
+  .portal-sidebar > .workspace-sidebar {
+    width: 100%;
+  }
+
+  .portal-main {
+    padding: 1rem;
+  }
+
+  .page-head {
+    padding: 1rem;
+    margin-block-end: 0;
+  }
+
+  .page-head h1 {
+    font-size: 1.5rem;
+  }
+
+  .file-view-item {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .portal-topbar {
+    padding: 0.75rem;
+  }
+
+  .topbar-user {
+    gap: 0.6rem;
+  }
+
+  .topbar-actions {
+    justify-content: flex-start;
+    gap: 0.5rem;
+  }
+
+  .portal-shell .outline-btn,
+  .portal-shell .primary-dark-btn {
+    padding-inline: 0.65rem;
+  }
+
+  .file-actions,
+  .button-group,
+  .modal-actions {
+    flex-wrap: wrap;
+  }
+}

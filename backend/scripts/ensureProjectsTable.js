@@ -26,7 +26,7 @@ async function ensureProjectsTable() {
 
 ensureProjectsTable()
   .then(() => process.exit(0))
-  .catch((error) => {
-    console.error('Failed to ensure projects table:', error.message);
+  .catch((_error) => {
+    console.error('Project schema setup failed.');
     process.exit(1);
   });

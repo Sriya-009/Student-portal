@@ -56,7 +56,7 @@ async function ensureUsersTable() {
 
 ensureUsersTable()
   .then(() => process.exit(0))
-  .catch((error) => {
-    console.error('Failed to ensure users table:', error.message);
+  .catch((_error) => {
+    console.error('User schema setup failed.');
     process.exit(1);
   });

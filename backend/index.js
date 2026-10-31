@@ -1,5 +1,7 @@
 require('dotenv').config();
 
+const appConfig = require('./config/appConfig');
+const { assertApprovedDatabaseTarget } = require('./config/databasePreflight');
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
@@ -10,20 +12,80 @@ const fs = require('fs');
 const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const { getPool, testConnection } = require('./db');
+const { getPool: baseGetPool, testConnection, withTransaction } = require('./db');
 const { requestChatCompletion } = require('./chatService');
+const { createChatRouter } = require('./routes/chatRoutes');
+const { createProjectRouter } = require('./routes/projectRoutes');
+const { createProjectFileRouter } = require('./routes/projectFileRoutes');
+const { createAdminRouter } = require('./routes/adminRoutes');
+const { createProfileRouter } = require('./routes/profileRoutes');
+const { createAuthRouter } = require('./routes/authRoutes');
+const { createProfilePhotoRouters } = require('./routes/profilePhotoRoutes');
+const { sendServerError } = require('./utils/httpResponse');
+const { createErrorHandlers } = require('./middleware/errorHandlers');
+const { createAuthMiddleware, isAccountActive } = require('./middleware/auth');
+const {
+  findRoleTableUser,
+  syncUserIntoRoleTables,
+  updateRoleTablePassword
+} = require('./services/roleTableSync');
+
+let databasePoolProvider = baseGetPool;
+
+function getPool() {
+  return databasePoolProvider();
+}
+
+function setDatabasePoolProvider(provider) {
+  const previousProvider = databasePoolProvider;
+  databasePoolProvider = provider;
+  return () => { databasePoolProvider = previousProvider; };
+}
+
+let projectFilePoolProvider = getPool;
+
+function getProjectFilePool() {
+  return projectFilePoolProvider();
+}
+
+function setProjectFilePoolProvider(provider) {
+  const previousProvider = projectFilePoolProvider;
+  projectFilePoolProvider = provider;
+  return () => { projectFilePoolProvider = previousProvider; };
+}
+
+let authIdentityProvider = async (identifier) => {
+  const user = await findUserByIdentifierOrEmail(getPool(), identifier);
+  return user
+    ? { identifier: user.identifier, role: user.role, is_active: user.is_active }
+    : null;
+};
+
+function setAuthIdentityProvider(provider) {
+  const previousProvider = authIdentityProvider;
+  authIdentityProvider = provider;
+  return () => { authIdentityProvider = previousProvider; };
+}
+
+const { authenticateRequest, requireRoles, isSelfOrAdmin } = createAuthMiddleware({
+  verifyToken: verifyAuthToken,
+  loadIdentity: (identifier) => authIdentityProvider(identifier)
+});
 
 const app = express();
 // Render places the app behind one reverse proxy; trust only that hop for client IPs.
 app.set('trust proxy', 1);
-const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = '1h';
-const BCRYPT_SALT_ROUNDS = Number(process.env.BCRYPT_SALT_ROUNDS || 10);
-const DEFAULT_ADMIN_IDENTIFIER = process.env.DEFAULT_ADMIN_IDENTIFIER || '';
-const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || '';
-const OTP_SESSION_TTL_MS = 5 * 60 * 1000;
-const MAX_OTP_ATTEMPTS = 5;
+const PORT = appConfig.port;
+function getHost(env = process.env) {
+  return env.HOST || '0.0.0.0';
+}
+const JWT_SECRET = appConfig.jwtSecret;
+const JWT_EXPIRES_IN = appConfig.jwtExpiresIn;
+const BCRYPT_SALT_ROUNDS = appConfig.bcryptSaltRounds;
+const DEFAULT_ADMIN_IDENTIFIER = appConfig.defaultAdminIdentifier;
+const DEFAULT_ADMIN_PASSWORD = appConfig.defaultAdminPassword;
+const OTP_SESSION_TTL_MS = appConfig.otpSessionTtlMs;
+const MAX_OTP_ATTEMPTS = appConfig.maxOtpAttempts;
 const otpSessions = new Map();
 const lastIssuedOtpByUser = new Map();
 const passwordResetTokens = new Map();
@@ -130,11 +192,15 @@ const chatRateLimiter = rateLimit({
 // ========== FILE UPLOAD CONFIG ==========
 const uploadsDir = path.join(__dirname, 'uploads', 'profile-photos');
 const projectFilesDir = path.join(__dirname, 'uploads', 'project-files');
+const projectFilesContentDir = path.join(__dirname, 'uploads', 'project-file-contents-v1');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 if (!fs.existsSync(projectFilesDir)) {
   fs.mkdirSync(projectFilesDir, { recursive: true });
+}
+if (!fs.existsSync(projectFilesContentDir)) {
+  fs.mkdirSync(projectFilesContentDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
@@ -164,11 +230,453 @@ const uploadMiddleware = multer({
 
 const projectFileUpload = multer({
   storage: multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, projectFilesDir),
-    filename: (req, _file, cb) => cb(null, path.basename(String(req.params.fileId || '')))
+    destination: (_req, _file, cb) => cb(null, projectFilesContentDir),
+    filename: (_req, _file, cb) => cb(null, `upload-${crypto.randomBytes(16).toString('hex')}.tmp`)
   }),
-  limits: { fileSize: 50 * 1024 * 1024 }
+  limits: { fileSize: 50 * 1024 * 1024, files: 1 }
 });
+
+const PROJECT_FILE_MIME_TYPES = {
+  '.doc': ['application/msword', 'application/octet-stream'],
+  '.docx': ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/octet-stream'],
+  '.pdf': ['application/pdf', 'application/octet-stream'],
+  '.txt': ['text/plain', 'application/octet-stream'],
+  '.ppt': ['application/vnd.ms-powerpoint', 'application/octet-stream'],
+  '.pptx': ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/octet-stream'],
+  '.xls': ['application/vnd.ms-excel', 'application/octet-stream'],
+  '.xlsx': ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/octet-stream'],
+  '.zip': ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'],
+  '.rar': ['application/vnd.rar', 'application/x-rar-compressed', 'application/octet-stream'],
+  '.7z': ['application/x-7z-compressed', 'application/octet-stream'],
+  '.csv': ['text/csv', 'application/vnd.ms-excel', 'application/octet-stream'],
+  '.js': ['application/javascript', 'text/javascript', 'text/plain', 'application/octet-stream'],
+  '.py': ['text/x-python', 'text/plain', 'application/octet-stream'],
+  '.java': ['text/x-java-source', 'text/plain', 'application/octet-stream'],
+  '.cpp': ['text/x-c++src', 'text/plain', 'application/octet-stream'],
+  '.c': ['text/x-csrc', 'text/plain', 'application/octet-stream'],
+  '.html': ['text/html', 'application/octet-stream'],
+  '.css': ['text/css', 'text/plain', 'application/octet-stream']
+};
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function hasValidCompoundFileStructure(bytes, requiredStreamName) {
+  const compoundSignature = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+  if (bytes.length < 512 || !bytes.subarray(0, 8).equals(compoundSignature)) {
+    return false;
+  }
+
+  const majorVersion = bytes.readUInt16LE(26);
+  const sectorShift = bytes.readUInt16LE(30);
+  const sectorSize = 2 ** sectorShift;
+  const validVersion = (majorVersion === 3 && sectorShift === 9)
+    || (majorVersion === 4 && sectorShift === 12);
+  if (!validVersion || bytes.readUInt16LE(28) !== 0xfffe || bytes.readUInt16LE(32) !== 6
+    || (majorVersion === 3 && bytes.readUInt32LE(40) !== 0)
+    || bytes.readUInt32LE(56) !== 4096 || bytes.length < sectorSize * 2) {
+    return false;
+  }
+
+  const numberOfSectors = Math.floor(bytes.length / sectorSize) - 1;
+  const fatSectorCount = bytes.readUInt32LE(44);
+  const firstDirectorySector = bytes.readUInt32LE(48);
+  const firstMiniFatSector = bytes.readUInt32LE(60);
+  const miniFatSectorCount = bytes.readUInt32LE(64);
+  const firstDifatSector = bytes.readUInt32LE(68);
+  const difatSectorCount = bytes.readUInt32LE(72);
+  const endOfChain = 0xfffffffe;
+  const freeSector = 0xffffffff;
+  if (!fatSectorCount || fatSectorCount > numberOfSectors || firstDirectorySector >= numberOfSectors
+    || (miniFatSectorCount && firstMiniFatSector >= numberOfSectors)
+    || (!miniFatSectorCount && ![endOfChain, freeSector].includes(firstMiniFatSector))
+    || (difatSectorCount && firstDifatSector >= numberOfSectors)
+    || (!difatSectorCount && ![endOfChain, freeSector].includes(firstDifatSector))) {
+    return false;
+  }
+
+  const fatSectorIds = [];
+  for (let offset = 76; offset < 512; offset += 4) {
+    const sectorId = bytes.readUInt32LE(offset);
+    if (sectorId !== freeSector) fatSectorIds.push(sectorId);
+  }
+  let difatSectorId = firstDifatSector;
+  for (let sectorIndex = 0; sectorIndex < difatSectorCount; sectorIndex += 1) {
+    if (difatSectorId >= numberOfSectors) return false;
+    const sectorOffset = (difatSectorId + 1) * sectorSize;
+    for (let offset = 0; offset < sectorSize - 4; offset += 4) {
+      const sectorId = bytes.readUInt32LE(sectorOffset + offset);
+      if (sectorId !== freeSector) fatSectorIds.push(sectorId);
+    }
+    difatSectorId = bytes.readUInt32LE(sectorOffset + sectorSize - 4);
+  }
+  if ((difatSectorCount && ![endOfChain, freeSector].includes(difatSectorId))
+    || fatSectorIds.length !== fatSectorCount
+    || new Set(fatSectorIds).size !== fatSectorIds.length
+    || fatSectorIds.some((sectorId) => sectorId >= numberOfSectors)) {
+    return false;
+  }
+
+  const fat = [];
+  for (const sectorId of fatSectorIds) {
+    const sectorOffset = (sectorId + 1) * sectorSize;
+    for (let offset = 0; offset < sectorSize; offset += 4) {
+      fat.push(bytes.readUInt32LE(sectorOffset + offset));
+    }
+  }
+
+  const directorySectors = [];
+  let directorySectorId = firstDirectorySector;
+  while (directorySectorId !== endOfChain) {
+    if (directorySectorId >= numberOfSectors || directorySectors.length >= numberOfSectors) return false;
+    directorySectors.push(directorySectorId);
+    directorySectorId = fat[directorySectorId];
+  }
+  if (!directorySectors.length) return false;
+
+  const directory = Buffer.concat(directorySectors.map((sectorId) => {
+    const sectorOffset = (sectorId + 1) * sectorSize;
+    return bytes.subarray(sectorOffset, sectorOffset + sectorSize);
+  }));
+  for (let offset = 0; offset + 128 <= directory.length; offset += 128) {
+    const objectType = directory.readUInt8(offset + 66);
+    const nameLength = directory.readUInt16LE(offset + 64);
+    if (objectType !== 2 || nameLength < 2 || nameLength > 64 || nameLength % 2 !== 0) continue;
+    const streamName = directory.subarray(offset, offset + nameLength - 2).toString('utf16le');
+    if (streamName === requiredStreamName) return true;
+  }
+  return false;
+}
+
+function hasValidSevenZipStructure(bytes) {
+  const signature = Buffer.from([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]);
+  if (bytes.length < 32 || !bytes.subarray(0, 6).equals(signature)) {
+    return false;
+  }
+  const nextHeaderOffset = bytes.readBigUInt64LE(12);
+  const nextHeaderSize = bytes.readBigUInt64LE(20);
+  if (nextHeaderOffset > BigInt(Number.MAX_SAFE_INTEGER) || nextHeaderSize === 0n
+    || nextHeaderSize > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return false;
+  }
+  const nextHeaderStart = 32 + Number(nextHeaderOffset);
+  const nextHeaderEnd = nextHeaderStart + Number(nextHeaderSize);
+  return crc32(bytes.subarray(12, 32)) === bytes.readUInt32LE(8)
+    && nextHeaderEnd <= bytes.length
+    && crc32(bytes.subarray(nextHeaderStart, nextHeaderEnd)) === bytes.readUInt32LE(28);
+}
+
+function hasValidPdfStructure(bytes) {
+  if (!/^%PDF-(?:1\.[0-7]|2\.0)/.test(bytes.subarray(0, 16).toString('ascii'))
+    || !bytes.subarray(-2048).toString('latin1').includes('%%EOF')) {
+    return false;
+  }
+  const content = bytes.toString('latin1');
+  const startXref = /startxref\s+(\d+)\s+%%EOF\s*$/.exec(content);
+  if (!startXref || !/\bendobj\b/.test(content)) {
+    return false;
+  }
+  const xrefOffset = Number(startXref[1]);
+  if (!Number.isSafeInteger(xrefOffset) || xrefOffset < 0 || xrefOffset >= bytes.length) {
+    return false;
+  }
+  const xrefContent = bytes.subarray(xrefOffset).toString('latin1').trimStart();
+  return xrefContent.startsWith('xref')
+    ? /\btrailer\b/.test(content)
+    : /^\d+\s+\d+\s+obj\b/.test(xrefContent) && /\/Type\s*\/XRef\b/.test(xrefContent);
+}
+
+function readRar5Integer(bytes, startOffset) {
+  let value = 0n;
+  let shift = 0n;
+  let offset = startOffset;
+  while (offset < bytes.length && shift < 56n) {
+    const byte = bytes[offset];
+    value |= BigInt(byte & 0x7f) << shift;
+    offset += 1;
+    if ((byte & 0x80) === 0) {
+      return value <= BigInt(Number.MAX_SAFE_INTEGER)
+        ? { value: Number(value), nextOffset: offset }
+        : null;
+    }
+    shift += 7n;
+  }
+  return null;
+}
+
+function hasValidRarStructure(bytes) {
+  const rar4Signature = Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x00]);
+  const rar5Signature = Buffer.from([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07, 0x01, 0x00]);
+  if (bytes.subarray(0, rar4Signature.length).equals(rar4Signature)) {
+    if (bytes.length < 20 || bytes.readUInt8(9) !== 0x73) return false;
+    const headerSize = bytes.readUInt16LE(12);
+    return headerSize >= 7
+      && 7 + headerSize <= bytes.length
+      && (crc32(bytes.subarray(9, 7 + headerSize)) & 0xffff) === bytes.readUInt16LE(7);
+  }
+  if (!bytes.subarray(0, rar5Signature.length).equals(rar5Signature) || bytes.length < 15) {
+    return false;
+  }
+  const headerSize = readRar5Integer(bytes, 12);
+  if (!headerSize || headerSize.value < 2) return false;
+  const headerEnd = headerSize.nextOffset + headerSize.value;
+  const headerType = readRar5Integer(bytes, headerSize.nextOffset);
+  return headerEnd <= bytes.length
+    && headerType?.value === 1
+    && crc32(bytes.subarray(12, headerEnd)) === bytes.readUInt32LE(8);
+}
+
+const PROJECT_FILE_SIGNATURES = {
+  '.pdf': hasValidPdfStructure,
+  '.doc': (bytes) => hasValidCompoundFileStructure(bytes, 'WordDocument'),
+  '.ppt': (bytes) => hasValidCompoundFileStructure(bytes, 'PowerPoint Document'),
+  '.xls': (bytes) => hasValidCompoundFileStructure(bytes, 'Workbook')
+    || hasValidCompoundFileStructure(bytes, 'Book'),
+  '.docx': (bytes) => hasValidZipStructure(bytes, ['[Content_Types].xml', 'word/document.xml']),
+  '.pptx': (bytes) => hasValidZipStructure(bytes, ['[Content_Types].xml', 'ppt/presentation.xml']),
+  '.xlsx': (bytes) => hasValidZipStructure(bytes, ['[Content_Types].xml', 'xl/workbook.xml']),
+  '.zip': (bytes) => hasValidZipStructure(bytes),
+  '.rar': hasValidRarStructure,
+  '.7z': hasValidSevenZipStructure
+};
+
+function hasValidZipStructure(bytes, requiredEntries = []) {
+  const minimumEndRecordLength = 22;
+  const maximumCommentLength = 0xffff;
+  const searchStart = Math.max(0, bytes.length - minimumEndRecordLength - maximumCommentLength);
+  let endRecordOffset = -1;
+  for (let offset = bytes.length - minimumEndRecordLength; offset >= searchStart; offset -= 1) {
+    if (bytes.readUInt32LE(offset) === 0x06054b50) {
+      endRecordOffset = offset;
+      break;
+    }
+  }
+  if (endRecordOffset < 0 || endRecordOffset + minimumEndRecordLength > bytes.length) {
+    return false;
+  }
+
+  const diskNumber = bytes.readUInt16LE(endRecordOffset + 4);
+  const centralDirectoryDisk = bytes.readUInt16LE(endRecordOffset + 6);
+  const entriesOnDisk = bytes.readUInt16LE(endRecordOffset + 8);
+  const entryCount = bytes.readUInt16LE(endRecordOffset + 10);
+  const centralDirectorySize = bytes.readUInt32LE(endRecordOffset + 12);
+  const centralDirectoryOffset = bytes.readUInt32LE(endRecordOffset + 16);
+  const commentLength = bytes.readUInt16LE(endRecordOffset + 20);
+  if (diskNumber !== 0 || centralDirectoryDisk !== 0 || entriesOnDisk !== entryCount
+    || entryCount === 0xffff || centralDirectorySize === 0xffffffff || centralDirectoryOffset === 0xffffffff
+    || endRecordOffset + minimumEndRecordLength + commentLength !== bytes.length
+    || centralDirectoryOffset + centralDirectorySize !== endRecordOffset) {
+    return false;
+  }
+
+  const entries = new Set();
+  let offset = centralDirectoryOffset;
+  for (let index = 0; index < entryCount; index += 1) {
+    if (offset + 46 > endRecordOffset || bytes.readUInt32LE(offset) !== 0x02014b50) {
+      return false;
+    }
+    const compressedSize = bytes.readUInt32LE(offset + 20);
+    const uncompressedSize = bytes.readUInt32LE(offset + 24);
+    const nameLength = bytes.readUInt16LE(offset + 28);
+    const extraLength = bytes.readUInt16LE(offset + 30);
+    const entryCommentLength = bytes.readUInt16LE(offset + 32);
+    const localHeaderOffset = bytes.readUInt32LE(offset + 42);
+    const endOffset = offset + 46 + nameLength + extraLength + entryCommentLength;
+    if (!nameLength || endOffset > endRecordOffset || compressedSize === 0xffffffff
+      || uncompressedSize === 0xffffffff || localHeaderOffset + 30 > centralDirectoryOffset
+      || bytes.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
+      return false;
+    }
+
+    const entryName = bytes.subarray(offset + 46, offset + 46 + nameLength).toString('utf8');
+    const localNameLength = bytes.readUInt16LE(localHeaderOffset + 26);
+    const localExtraLength = bytes.readUInt16LE(localHeaderOffset + 28);
+    const localNameStart = localHeaderOffset + 30;
+    const localDataStart = localNameStart + localNameLength + localExtraLength;
+    const localEntryName = bytes.subarray(localNameStart, localNameStart + localNameLength).toString('utf8');
+    if (localEntryName !== entryName
+      || bytes.readUInt16LE(localHeaderOffset + 6) !== bytes.readUInt16LE(offset + 8)
+      || bytes.readUInt16LE(localHeaderOffset + 8) !== bytes.readUInt16LE(offset + 10)
+      || localDataStart + compressedSize > centralDirectoryOffset) {
+      return false;
+    }
+    if (!entryName || entryName.startsWith('/') || entryName.startsWith('\\')
+      || entryName.split(/[\\/]/).includes('..')) {
+      return false;
+    }
+    entries.add(entryName);
+    offset = endOffset;
+  }
+
+  return offset === endRecordOffset
+    && requiredEntries.every((entryName) => entries.has(entryName));
+}
+
+function isValidProjectFile(file) {
+  if (!file?.path || !file.originalname || !file.size) {
+    return false;
+  }
+
+  const extension = path.extname(file.originalname).toLowerCase();
+  const allowedMimeTypes = PROJECT_FILE_MIME_TYPES[extension];
+  if (!allowedMimeTypes) {
+    return false;
+  }
+
+  const mimeType = String(file.mimetype || '').toLowerCase();
+  if (mimeType && !allowedMimeTypes.includes(mimeType)) {
+    return false;
+  }
+
+  const bytes = fs.readFileSync(file.path);
+  const signatureCheck = PROJECT_FILE_SIGNATURES[extension];
+  if (signatureCheck) {
+    return signatureCheck(bytes);
+  }
+
+  // A supported binary format must not be accepted under a text/source extension.
+  const knownBinarySignatures = [
+    Buffer.from('%PDF-'),
+    Buffer.from('PK\x03\x04', 'binary'),
+    Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
+    Buffer.from('Rar!\x1a\x07', 'binary'),
+    Buffer.from([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]),
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    Buffer.from([0xff, 0xd8, 0xff]),
+    Buffer.from('GIF87a'),
+    Buffer.from('GIF89a'),
+    Buffer.from('RIFF')
+  ];
+  if (knownBinarySignatures.some((signature) => bytes.subarray(0, signature.length).equals(signature))) {
+    return false;
+  }
+
+  // Source and text files must be valid UTF-8 without embedded NUL bytes.
+  if (bytes.includes(0)) return false;
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function getProjectFileStorageName(projectId, fileId) {
+  return crypto.createHash('sha256')
+    .update(`${String(projectId)}\u0000${String(fileId)}`)
+    .digest('hex');
+}
+
+function getPendingProjectFilePrefix(projectId, fileId) {
+  return `pending-${getProjectFileStorageName(projectId, fileId)}-`;
+}
+
+function getProjectFileContentPath(contentKey) {
+  if (!/^[a-f0-9]{64}$/.test(String(contentKey || ''))) {
+    return null;
+  }
+  return path.join(projectFilesContentDir, `content-${contentKey}`);
+}
+
+function getProjectFileTransactionMarkerPath(contentKey) {
+  if (!/^[a-f0-9]{64}$/.test(String(contentKey || ''))) {
+    return null;
+  }
+  return path.join(projectFilesContentDir, `transaction-${contentKey}.journal`);
+}
+
+function listPendingProjectFiles(projectId, fileId) {
+  const prefix = getPendingProjectFilePrefix(projectId, fileId);
+  return fs.readdirSync(projectFilesContentDir)
+    .filter((filename) => filename.startsWith(prefix) && filename.endsWith('.stage'))
+    .map((filename) => {
+      const fullPath = path.join(projectFilesContentDir, filename);
+      const contentKey = filename.slice(prefix.length, -'.stage'.length);
+      return /^[a-f0-9]{64}$/.test(contentKey)
+        ? { path: fullPath, contentKey, modifiedAt: fs.statSync(fullPath).mtimeMs }
+        : null;
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.modifiedAt - left.modifiedAt);
+}
+
+async function recoverProjectFileContent() {
+  const pool = getProjectFilePool();
+  const [rows] = await pool.query('SELECT content_key FROM project_files WHERE content_key IS NOT NULL');
+  const committedKeys = new Set(rows.map((row) => String(row.content_key || '')).filter((key) => /^[a-f0-9]{64}$/.test(key)));
+  const staleBefore = Date.now() - (24 * 60 * 60 * 1000);
+
+  for (const filename of fs.readdirSync(projectFilesContentDir)) {
+    const fullPath = path.join(projectFilesContentDir, filename);
+    const modifiedAt = fs.statSync(fullPath).mtimeMs;
+    const stagedContent = /^pending-[a-f0-9]{64}-[a-f0-9]{64}\.stage$/.test(filename);
+    const multipartTemp = /^upload-[a-f0-9]{32}\.tmp$/.test(filename);
+    const transactionMarker = /^transaction-([a-f0-9]{64})\.journal$/.exec(filename);
+    if ((stagedContent || multipartTemp) && modifiedAt < staleBefore) {
+      safeUnlink(fullPath);
+    } else if (transactionMarker) {
+      // A different live server process may own a recently-created marker.
+      // Reconcile only markers old enough to be considered abandoned.
+      if (modifiedAt >= staleBefore) continue;
+      const key = transactionMarker[1];
+      if (committedKeys.has(key)) {
+        safeUnlink(fullPath);
+      } else {
+        safeUnlink(getProjectFileContentPath(key));
+        safeUnlink(fullPath);
+      }
+    }
+  }
+}
+
+async function stageProjectFile(uploadPath, projectId, fileId) {
+  const contentKey = crypto.randomBytes(32).toString('hex');
+  const pendingPath = path.join(
+    projectFilesContentDir,
+    `${getPendingProjectFilePrefix(projectId, fileId)}${contentKey}.stage`
+  );
+  await fs.promises.rename(uploadPath, pendingPath);
+  return { path: pendingPath, contentKey };
+}
+
+async function promotePendingProjectFile(pendingFile) {
+  const contentPath = getProjectFileContentPath(pendingFile.contentKey);
+  if (!contentPath) {
+    throw new Error('Invalid staged project file key.');
+  }
+  await fs.promises.rename(pendingFile.path, contentPath);
+  return contentPath;
+}
+
+function getLegacyProjectFilePath(fileId) {
+  const identifier = String(fileId || '');
+  if (!identifier || identifier.length > 80 || identifier === '.' || identifier === '..'
+    || /[\\/\u0000]/.test(identifier) || path.basename(identifier) !== identifier) {
+    return null;
+  }
+  return path.join(projectFilesDir, identifier);
+}
+
+function resolveProjectFilePath(projectId, fileId, contentKey = null) {
+  const versionedContentPath = getProjectFileContentPath(contentKey);
+  if (versionedContentPath && fs.existsSync(versionedContentPath)) {
+    return versionedContentPath;
+  }
+  const scopedFilePath = path.join(projectFilesDir, getProjectFileStorageName(projectId, fileId));
+  if (fs.existsSync(scopedFilePath)) {
+    return scopedFilePath;
+  }
+  const legacyFilePath = getLegacyProjectFilePath(fileId);
+  return legacyFilePath && fs.existsSync(legacyFilePath) ? legacyFilePath : null;
+}
 
 function safeUnlink(filePath) {
   if (!filePath) {
@@ -246,53 +754,11 @@ app.get('/uploads/profile-photos/:filename', (req, res) => {
 });
 app.use('/api', authenticateRequest);
 
-app.post('/api/chat', requireRoles('student', 'faculty', 'admin'), chatRateLimiter, async (req, res) => {
-  const { message, history } = req.body || {};
-  if (typeof message !== 'string' || !message.trim() || message.length > 2000) {
-    return res.status(400).json({ ok: false, error: 'message must be a non-empty string under 2000 characters.' });
-  }
-  if (history !== undefined && !Array.isArray(history)) {
-    return res.status(400).json({ ok: false, error: 'history must be an array.' });
-  }
-  if (JSON.stringify({ message, history }).length > 32000) {
-    return res.status(413).json({ ok: false, error: 'Chat request is too large.' });
-  }
-
-  try {
-    const response = await requestChatCompletion(message.trim(), history);
-    return res.json({ ok: true, message: response });
-  } catch (error) {
-    if (error.code === 'INVALID_CHAT_HISTORY') {
-      return res.status(400).json({ ok: false, error: 'history contains invalid messages.' });
-    }
-    if (error.code === 'AI_NOT_CONFIGURED') {
-      return res.status(503).json({ ok: false, error: 'The assistant is not configured yet.' });
-    }
-    if (error.code === 'AI_TIMEOUT') {
-      return res.status(504).json({ ok: false, error: 'The assistant took too long to respond. Please try again.' });
-    }
-    if (error.code === 'AI_RATE_LIMITED') {
-      return res.status(429).json({ ok: false, error: 'The assistant usage limit has been reached. Please try again later.' });
-    }
-    if (error.code === 'AI_INVALID_REQUEST') {
-      return res.status(502).json({ ok: false, error: 'The assistant request was rejected by the provider.' });
-    }
-    if (error.code === 'AI_INVALID_API_KEY') {
-      return res.status(502).json({ ok: false, error: 'The assistant provider authentication is invalid.' });
-    }
-    if (error.code === 'AI_FORBIDDEN') {
-      return res.status(502).json({ ok: false, error: 'The assistant provider denied this request.' });
-    }
-    if (error.code === 'AI_MODEL_OR_ENDPOINT_NOT_FOUND') {
-      return res.status(502).json({ ok: false, error: 'The assistant model or endpoint was not found.' });
-    }
-    if (error.code === 'AI_PROVIDER_UNAVAILABLE') {
-      return res.status(502).json({ ok: false, error: 'The assistant provider is temporarily unavailable.' });
-    }
-    console.error('Chat provider request failed:', error.message);
-    return res.status(502).json({ ok: false, error: 'The assistant is temporarily unavailable.' });
-  }
-});
+app.use('/api/chat', createChatRouter({
+  requireRoles,
+  chatRateLimiter,
+  requestChatCompletion
+}));
 
 function maskPhone(phoneNumber) {
   const digits = (phoneNumber || '').replace(/\D/g, '');
@@ -327,15 +793,20 @@ function createAuthToken(user) {
       type: 'access'
     },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRES_IN }
+    { expiresIn: JWT_EXPIRES_IN, algorithm: 'HS256' }
   );
 }
 
 function verifyAuthToken(token) {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.type !== 'access') {
-      throw new Error('Invalid token type');
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
+    if (!decoded || typeof decoded !== 'object'
+      || decoded.type !== 'access'
+      || typeof decoded.sub !== 'string' || !decoded.sub.trim()
+      || typeof decoded.role !== 'string' || !decoded.role.trim() || decoded.role.length > 30
+      || !Number.isFinite(decoded.iat)
+      || !Number.isFinite(decoded.exp)) {
+      throw new Error('Invalid access token claims');
     }
     return decoded;
   } catch (error) {
@@ -374,15 +845,16 @@ async function verifyPasswordAndMigrate(pool, user, plainPassword) {
     return bcrypt.compare(String(plainPassword), storedPassword);
   }
 
-  // Legacy plaintext credentials must not be accepted or retained.
-  const unusableHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), BCRYPT_SALT_ROUNDS);
-  await pool.query(
-    'UPDATE users SET password = ?, must_reset_password = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-    [unusableHash, user.id]
-  );
-  user.password = unusableHash;
-  user.must_reset_password = 1;
-  await syncUserIntoRoleTables(pool, user);
+  // Legacy role-table accounts have no users.id row to migrate. Never issue
+  // an UPDATE against a missing/unknown user ID or replace their stored hash.
+  if (user.accountSource === 'role_table'
+    || !Number.isInteger(Number(user.id)) || Number(user.id) <= 0) {
+    return false;
+  }
+
+  // Reject unsupported legacy credentials without mutating account state.
+  // A failed password attempt must never lock out an account or replace a
+  // legacy hash. Password changes belong to an authenticated reset workflow.
   return false;
 }
 
@@ -469,7 +941,24 @@ async function findUserByIdentifierOrEmail(pool, identifier) {
      LIMIT 1`,
     [normalized, normalized]
   );
-  return rows[0] || null;
+  const user = rows[0] || null;
+  if (!user) {
+    return findRoleTableUser(pool, normalized);
+  }
+
+  // Some older installations kept the usable password hash only in the
+  // role-specific table. Reuse it in memory for authentication; do not write
+  // it back or replace any stored account data.
+  if (!String(user.password || '').trim() && user.role) {
+    const roleUser = await findRoleTableUser(pool, normalized, user.role);
+    if (roleUser && String(roleUser.identifier).toLowerCase() === String(user.identifier).toLowerCase()
+      && String(roleUser.email || '').toLowerCase() === String(user.email || '').toLowerCase()
+      && String(roleUser.password || '').trim()) {
+      return { ...user, password: roleUser.password };
+    }
+  }
+
+  return user;
 }
 
 function parseJsonArray(value) {
@@ -487,59 +976,6 @@ function parseJsonArray(value) {
   } catch (_error) {
     return [];
   }
-}
-
-function sendServerError(res, error) {
-  console.error(error);
-  return res.status(500).json({ ok: false, error: 'An unexpected server error occurred.' });
-}
-
-function authenticateRequest(req, res, next) {
-  const publicPaths = new Set([
-    '/health',
-    '/auth/login',
-    '/auth/signup',
-    '/auth/forgot-password',
-    '/auth/reset-password',
-    '/auth/verify-otp',
-    '/auth/resend-otp',
-    '/auth/verify-token'
-  ]);
-
-  if (publicPaths.has(req.path)) {
-    return next();
-  }
-
-  const authorization = String(req.get('authorization') || '');
-  const token = authorization.startsWith('Bearer ')
-    ? authorization.slice('Bearer '.length).trim()
-    : '';
-
-  if (!token) {
-    return res.status(401).json({ ok: false, error: 'Authentication required.' });
-  }
-
-  try {
-    const decoded = verifyAuthToken(token);
-    req.auth = decoded;
-    return next();
-  } catch (_error) {
-    return res.status(401).json({ ok: false, error: 'Invalid or expired token.' });
-  }
-}
-
-function requireRoles(...roles) {
-  return (req, res, next) => {
-    if (!req.auth || !roles.includes(String(req.auth.role || '').toLowerCase())) {
-      return res.status(403).json({ ok: false, error: 'You are not authorized to perform this action.' });
-    }
-    return next();
-  };
-}
-
-function isSelfOrAdmin(req, identifier) {
-  return String(req.auth?.role).toLowerCase() === 'admin'
-    || String(req.auth?.sub || '').toLowerCase() === String(identifier || '').toLowerCase();
 }
 
 async function canAccessProject(pool, req, projectId) {
@@ -563,6 +999,30 @@ async function canAccessProject(pool, req, projectId) {
   return String(project.owner_identifier || '').toLowerCase() === actor
     || String(project.assigned_faculty_identifier || '').toLowerCase() === actor;
 }
+
+function validateProjectUploadIdentifiers(req, res, next) {
+  const projectId = String(req.params.projectId || '').trim();
+  const fileId = String(req.params.fileId || '').trim();
+  if (!projectId || projectId.length > 60 || !fileId || fileId.length > 80 || /[\\/\u0000-\u001f]/.test(fileId)) {
+    return res.status(400).json({ ok: false, error: 'projectId and fileId must be valid.' });
+  }
+  return next();
+}
+
+function createProjectAccessMiddleware(poolProvider = getPool) {
+  return async (req, res, next) => {
+    try {
+      if (!await canAccessProject(poolProvider(), req, req.params.projectId)) {
+        return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
+      }
+      return next();
+    } catch (error) {
+      return sendServerError(res, error);
+    }
+  };
+}
+
+const authorizeProjectUpload = createProjectAccessMiddleware(getProjectFilePool);
 
 function toDbPatchValue(inputKey, value) {
   if (value === undefined) {
@@ -739,6 +1199,7 @@ async function ensureProjectWorkspaceTables() {
     CREATE TABLE IF NOT EXISTS project_files (
       id VARCHAR(80) PRIMARY KEY,
       project_id VARCHAR(60) NOT NULL,
+      content_key VARCHAR(64) NULL,
       file_name VARCHAR(260) NOT NULL,
       file_size BIGINT NOT NULL DEFAULT 0,
       file_type VARCHAR(60) NULL,
@@ -768,6 +1229,27 @@ async function ensureProjectWorkspaceTables() {
       INDEX idx_project_feedback_project (project_id)
     )
   `);
+}
+
+async function ensureProjectFileContentKeyColumn() {
+  const pool = getPool();
+  const [rows] = await pool.query("SHOW COLUMNS FROM project_files LIKE 'content_key'");
+  if (rows.length === 0) {
+    try {
+      await pool.query('ALTER TABLE project_files ADD COLUMN content_key VARCHAR(64) NULL');
+    } catch (error) {
+      // Concurrent app instances may both observe the column as missing.
+      if (error?.code !== 'ER_DUP_FIELDNAME') throw error;
+    }
+    return;
+  }
+
+  const columnType = String(rows[0].Type || rows[0].type || '').toLowerCase();
+  const sizedText = /^(?:var)?char\((\d+)\)/.exec(columnType);
+  const unboundedText = /^(?:tinytext|text|mediumtext|longtext)$/.test(columnType);
+  if ((!sizedText || Number(sizedText[1]) < 64) && !unboundedText) {
+    throw new Error('project_files.content_key cannot store a 64-character key; manual schema review is required.');
+  }
 }
 
 async function ensureStudentFacultyAssignmentColumn() {
@@ -836,185 +1318,58 @@ async function ensureRoleTables() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       )
     `);
-    await pool.query('UPDATE student SET password = NULL');
-    await pool.query('UPDATE faculty SET password = NULL');
-    await pool.query('UPDATE admin SET password = NULL');
 }
 
-async function syncUserIntoRoleTables(pool, user) {
-  const normalizedRole = String(user?.role || '').trim().toLowerCase();
-  const identifier = String(user?.identifier || '').trim();
-  const email = String(user?.email || '').trim().toLowerCase();
-  const name = String(user?.name || '').trim();
-
-  if (!normalizedRole || !identifier || !email || !name) {
-    return;
-  }
-
-  // Ensure only one role table contains this account.
-  await pool.query('DELETE FROM student WHERE LOWER(email) = LOWER(?) OR LOWER(registration_no) = LOWER(?)', [email, identifier]);
-  await pool.query('DELETE FROM faculty WHERE LOWER(email) = LOWER(?) OR LOWER(employee_id) = LOWER(?)', [email, identifier]);
-  await pool.query('DELETE FROM admin WHERE LOWER(email) = LOWER(?) OR LOWER(employee_id) = LOWER(?)', [email, identifier]);
-
-  if (normalizedRole === 'student') {
-    await pool.query(
-      `INSERT INTO student
-       (registration_no, name, email, password, course, semester, section, batch_year, date_of_birth, guardian_name, guardian_phone, address, profile_photo_url, is_active, must_reset_password)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         name = VALUES(name),
-         email = VALUES(email),
-         password = VALUES(password),
-         course = VALUES(course),
-         semester = VALUES(semester),
-         section = VALUES(section),
-         batch_year = VALUES(batch_year),
-         date_of_birth = VALUES(date_of_birth),
-         guardian_name = VALUES(guardian_name),
-         guardian_phone = VALUES(guardian_phone),
-         address = VALUES(address),
-         profile_photo_url = VALUES(profile_photo_url),
-         is_active = VALUES(is_active),
-         must_reset_password = VALUES(must_reset_password),
-         updated_at = CURRENT_TIMESTAMP`,
-      [
-        identifier,
-        name,
-        email,
-        null,
-        user.department || null,
-        user.semester || null,
-        user.section || null,
-        user.batch_year || null,
-        user.date_of_birth || null,
-        user.guardian_name || null,
-        user.guardian_phone || null,
-        user.address || null,
-        user.photo_url || null,
-        user.is_active === undefined ? 1 : (user.is_active ? 1 : 0),
-        user.must_reset_password ? 1 : 0
-      ]
-    );
-    return;
-  }
-
-  if (normalizedRole === 'faculty') {
-    await pool.query(
-      `INSERT INTO faculty
-       (employee_id, name, email, password, department, designation, specialization, qualification, office_location, office_hours, joining_date, bio, profile_photo_url, is_active, must_reset_password)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         name = VALUES(name),
-         email = VALUES(email),
-         password = VALUES(password),
-         department = VALUES(department),
-         designation = VALUES(designation),
-         specialization = VALUES(specialization),
-         qualification = VALUES(qualification),
-         office_location = VALUES(office_location),
-         office_hours = VALUES(office_hours),
-         joining_date = VALUES(joining_date),
-         bio = VALUES(bio),
-         profile_photo_url = VALUES(profile_photo_url),
-         is_active = VALUES(is_active),
-         must_reset_password = VALUES(must_reset_password),
-         updated_at = CURRENT_TIMESTAMP`,
-      [
-        identifier,
-        name,
-        email,
-        null,
-        user.department || null,
-        user.designation || null,
-        user.specialization || null,
-        user.qualification || null,
-        user.office_location || null,
-        user.office_hours || null,
-        user.joining_date || null,
-        user.bio || null,
-        user.photo_url || null,
-        user.is_active === undefined ? 1 : (user.is_active ? 1 : 0),
-        user.must_reset_password ? 1 : 0
-      ]
-    );
-    return;
-  }
-
-  if (normalizedRole === 'admin') {
-    const parsedAccessLevel = Number(user.access_level);
-    const normalizedAccessLevel = Number.isFinite(parsedAccessLevel) ? parsedAccessLevel : 1;
-    await pool.query(
-      `INSERT INTO admin
-       (employee_id, name, email, password, role, access_level, permissions_json, two_factor_enabled, emergency_contact, is_active, must_reset_password)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         name = VALUES(name),
-         email = VALUES(email),
-         password = VALUES(password),
-         role = VALUES(role),
-         access_level = VALUES(access_level),
-         permissions_json = VALUES(permissions_json),
-         two_factor_enabled = VALUES(two_factor_enabled),
-         emergency_contact = VALUES(emergency_contact),
-         is_active = VALUES(is_active),
-         must_reset_password = VALUES(must_reset_password),
-         updated_at = CURRENT_TIMESTAMP`,
-      [
-        identifier,
-        name,
-        email,
-        null,
-        'admin',
-        normalizedAccessLevel,
-        user.permissions_json || null,
-        user.two_factor_enabled ? 1 : 0,
-        user.emergency_contact || null,
-        user.is_active === undefined ? 1 : (user.is_active ? 1 : 0),
-        user.must_reset_password ? 1 : 0
-      ]
-    );
-  }
-}
-
-async function ensureDefaultAdmin() {
+async function ensureDefaultAdmin(identifier = DEFAULT_ADMIN_IDENTIFIER, password = DEFAULT_ADMIN_PASSWORD) {
   const pool = getPool();
-  const normalizedIdentifier = String(DEFAULT_ADMIN_IDENTIFIER).trim().toLowerCase();
+  const normalizedIdentifier = String(identifier).trim().toLowerCase();
 
-  if (!normalizedIdentifier || !DEFAULT_ADMIN_PASSWORD) {
+  if (!normalizedIdentifier || !password) {
     console.warn('Default admin provisioning skipped; set DEFAULT_ADMIN_IDENTIFIER and DEFAULT_ADMIN_PASSWORD explicitly.');
     return;
   }
 
-  const [existingRows] = await pool.query(
-    'SELECT id FROM users WHERE LOWER(identifier) = ? LIMIT 1',
-    [normalizedIdentifier]
-  );
+  const passwordHash = await bcrypt.hash(String(password), BCRYPT_SALT_ROUNDS);
+  try {
+    await withTransaction(pool, async (connection) => {
+      const [existingRows] = await connection.query(
+        'SELECT id FROM users WHERE LOWER(identifier) = ? LIMIT 1 FOR UPDATE',
+        [normalizedIdentifier]
+      );
+      if (existingRows.length > 0) return;
 
-  if (existingRows.length > 0) {
-    return;
-  }
+      // Legacy installations may have an administrator only in the role
+      // mirror. Reuse that identity instead of provisioning a second account
+      // whose configured password could shadow the existing credentials.
+      const [legacyAdminRows] = await connection.query(
+        'SELECT employee_id FROM admin WHERE LOWER(employee_id) = ? OR LOWER(email) = ? LIMIT 1 FOR UPDATE',
+        [normalizedIdentifier, `${normalizedIdentifier}@portal.local`]
+      );
+      if (legacyAdminRows.length > 0) return;
 
-  const passwordHash = await bcrypt.hash(String(DEFAULT_ADMIN_PASSWORD), BCRYPT_SALT_ROUNDS);
-  await pool.query(
-    `INSERT INTO users
-     (identifier, name, email, role, department, access_level, is_active, must_reset_password, password)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      String(DEFAULT_ADMIN_IDENTIFIER).trim(),
-      'System Default Admin',
-      `${String(DEFAULT_ADMIN_IDENTIFIER).trim().toLowerCase()}@portal.local`,
-      'admin',
-      'Administration',
-      'Super Admin',
-      1,
-      0,
-      passwordHash
-    ]
-  );
+      await connection.query(
+        `INSERT INTO users
+         (identifier, name, email, role, department, access_level, is_active, must_reset_password, password)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          String(identifier).trim(),
+          'System Default Admin',
+          `${String(identifier).trim().toLowerCase()}@portal.local`,
+          'admin',
+          'Administration',
+          'Super Admin',
+          1,
+          0,
+          passwordHash
+        ]
+      );
 
-  const createdAdmin = await findUserByIdentifierOrEmail(pool, String(DEFAULT_ADMIN_IDENTIFIER).trim());
-  if (createdAdmin) {
-    await syncUserIntoRoleTables(pool, createdAdmin);
+      const createdAdmin = await findUserByIdentifierOrEmail(connection, String(DEFAULT_ADMIN_IDENTIFIER).trim());
+      if (createdAdmin) await syncUserIntoRoleTables(connection, createdAdmin);
+    });
+  } catch (error) {
+    // Two app instances may provision at once. The unique key keeps this idempotent.
+    if (error?.code !== 'ER_DUP_ENTRY') throw error;
   }
 }
 
@@ -1082,8 +1437,9 @@ async function ensureTempWorkspaceSeed() {
 
   if (tempStudent && tempFaculty) {
     await pool.query(
-      'UPDATE users SET assigned_faculty_identifier = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [tempFaculty.identifier, tempStudent.id]
+      `UPDATE users SET assigned_faculty_identifier = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE LOWER(identifier) = LOWER(?) AND role = 'student'`,
+      [tempFaculty.identifier, tempStudent.identifier]
     );
   }
 
@@ -1161,1123 +1517,138 @@ app.get('/', (_req, res) => {
   res.status(200).send('Student Portal API is running. Use /api/health for status.');
 });
 
-app.get('/api/users', requireRoles('admin'), async (_req, res) => {
-  try {
-    const pool = getPool();
-    const [rows] = await pool.query(
-      `SELECT ${USER_SELECT_FIELDS} FROM users ORDER BY id DESC LIMIT 100`
-    );
+app.use('/api/projects', createProjectRouter({
+  requireRoles,
+  getPool,
+  findUserByIdentifierOrEmail,
+  generateProjectIdentifier,
+  normalizeDateOrNull,
+  toSafeProject,
+  toSafeProjectTask,
+  toSafeFeedbackCorrection,
+  canAccessProject,
+  withTransaction,
+  sendServerError
+}));
 
-    res.json({ ok: true, users: rows.map(toSafeUser) });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
+app.use('/api/projects/:projectId/files', createProjectFileRouter({
+  requireRoles,
+  validateProjectUploadIdentifiers,
+  authorizeProjectUpload,
+  projectFileUpload,
+  getProjectFilePool,
+  canAccessProject,
+  toSafeProjectFile,
+  sendServerError,
+  isValidProjectFile,
+  safeUnlink,
+  stageProjectFile,
+  resolveProjectFilePath,
+  path,
+  getProjectFileTransactionMarkerPath,
+  listPendingProjectFiles,
+  fs,
+  promotePendingProjectFile,
+  normalizeDateOrNull
+}));
+
+app.use('/api', createAdminRouter({
+  requireRoles,
+  getPool,
+  userSelectFields: USER_SELECT_FIELDS,
+  toSafeUser,
+  sendServerError,
+  findUserByIdentifierOrEmail,
+  validatePasswordStrength,
+  bcrypt,
+  saltRounds: BCRYPT_SALT_ROUNDS,
+  withTransaction,
+  syncUserIntoRoleTables
+}));
+
+app.use('/api/profile', createProfileRouter({
+  getPool,
+  findUserByIdentifierOrEmail,
+  toSafeUser,
+  sendServerError,
+  isSelfOrAdmin,
+  profileFieldMap: PROFILE_FIELD_MAP,
+  toDbPatchValue,
+  withTransaction,
+  syncUserIntoRoleTables
+}));
+
+const profilePhotoRouters = createProfilePhotoRouters({
+  uploadMiddleware,
+  getPool,
+  isSelfOrAdmin,
+  safeUnlink,
+  hasValidImageSignature,
+  path,
+  uploadsDir,
+  createPhotoUrl,
+  sendServerError
 });
-
-app.get('/api/projects', async (req, res) => {
-  try {
-    const pool = getPool();
-    let query = 'SELECT * FROM projects ORDER BY updated_at DESC, created_at DESC LIMIT 200';
-    let params = [];
-    if (String(req.auth.role).toLowerCase() === 'student') {
-      query = 'SELECT * FROM projects WHERE owner_identifier = ? ORDER BY updated_at DESC, created_at DESC LIMIT 200';
-      params = [req.auth.sub];
-    } else if (String(req.auth.role).toLowerCase() === 'faculty') {
-      query = `SELECT p.*
-        FROM projects p
-        INNER JOIN users s ON s.identifier = p.owner_identifier
-        WHERE s.assigned_faculty_identifier = ?
-        ORDER BY p.updated_at DESC, p.created_at DESC LIMIT 200`;
-      params = [req.auth.sub];
-    }
-    const [rows] = await pool.query(query, params);
-
-    return res.json({
-      ok: true,
-      projects: rows.map(toSafeProject)
-    });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.post('/api/projects', requireRoles('student'), async (req, res) => {
-  const name = String(req.body?.name || '').trim();
-  const description = String(req.body?.description || '').trim();
-  const ownerIdentifier = String(req.auth.sub || '').trim();
-  const department = String(req.body?.department || '').trim();
-  const deadline = normalizeDateOrNull(req.body?.deadline);
-
-  if (!name) {
-    return res.status(400).json({ ok: false, error: 'Project name is required' });
-  }
-
-  if (!ownerIdentifier) {
-    return res.status(400).json({ ok: false, error: 'ownerIdentifier is required' });
-  }
-
-  try {
-    const pool = getPool();
-    const owner = await findUserByIdentifierOrEmail(pool, ownerIdentifier);
-
-    if (!owner || String(owner.role || '').toLowerCase() !== 'student') {
-      return res.status(404).json({ ok: false, error: 'Student owner account not found' });
-    }
-
-    const projectId = generateProjectIdentifier();
-    await pool.query(
-      `INSERT INTO projects (id, name, description, department, status, progress_percent, deadline, owner_identifier)
-       VALUES (?, ?, ?, ?, 'ongoing', 0, ?, ?)`,
-      [
-        projectId,
-        name,
-        description || null,
-        department || owner.department || null,
-        deadline,
-        owner.identifier
-      ]
-    );
-
-    const [rows] = await pool.query('SELECT * FROM projects WHERE id = ? LIMIT 1', [projectId]);
-    return res.status(201).json({ ok: true, project: toSafeProject(rows[0]) });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.delete('/api/projects/:projectId', requireRoles('student', 'admin'), async (req, res) => {
-  const projectId = String(req.params.projectId || '').trim();
-  const ownerIdentifier = String(req.auth.sub || '').trim();
-
-  if (!projectId) {
-    return res.status(400).json({ ok: false, error: 'projectId is required' });
-  }
-
-  if (!ownerIdentifier) {
-    return res.status(400).json({ ok: false, error: 'ownerIdentifier is required' });
-  }
-
-  try {
-    const pool = getPool();
-    const [rows] = await pool.query('SELECT * FROM projects WHERE id = ? LIMIT 1', [projectId]);
-    const project = rows[0];
-
-    if (!project) {
-      return res.status(404).json({ ok: false, error: 'Project not found' });
-    }
-
-    if (String(req.auth.role).toLowerCase() !== 'admin'
-      && String(project.owner_identifier || '').toLowerCase() !== ownerIdentifier.toLowerCase()) {
-      return res.status(403).json({ ok: false, error: 'You can only delete your own projects' });
-    }
-
-    await pool.query('DELETE FROM projects WHERE id = ?', [projectId]);
-    return res.json({ ok: true, deletedProjectId: projectId });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.get('/api/projects/:projectId/tasks', async (req, res) => {
-  const projectId = String(req.params.projectId || '').trim();
-  if (!projectId) {
-    return res.status(400).json({ ok: false, error: 'projectId is required' });
-  }
-
-  try {
-    const pool = getPool();
-    if (!await canAccessProject(pool, req, projectId)) {
-      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
-    }
-    const [rows] = await pool.query(
-      'SELECT * FROM project_tasks WHERE project_id = ? ORDER BY created_at ASC',
-      [projectId]
-    );
-    return res.json({ ok: true, tasks: rows.map(toSafeProjectTask) });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.put('/api/projects/:projectId/tasks', requireRoles('faculty', 'admin'), async (req, res) => {
-  const projectId = String(req.params.projectId || '').trim();
-  const tasks = Array.isArray(req.body?.tasks) ? req.body.tasks : null;
-
-  if (!projectId) {
-    return res.status(400).json({ ok: false, error: 'projectId is required' });
-  }
-
-  if (!tasks) {
-    return res.status(400).json({ ok: false, error: 'tasks array is required' });
-  }
-
-  let connection;
-  try {
-    const pool = getPool();
-    if (!await canAccessProject(pool, req, projectId)) {
-      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
-    }
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-    await connection.query('DELETE FROM project_tasks WHERE project_id = ?', [projectId]);
-
-    for (const task of tasks) {
-      const taskId = String(task?.id || `TSK-${Date.now()}-${Math.floor(Math.random() * 1000)}`).trim();
-      const title = String(task?.title || '').trim();
-      if (!title) {
-        // eslint-disable-next-line no-continue
-        continue;
-      }
-
-      await connection.query(
-        `INSERT INTO project_tasks
-         (id, project_id, title, description, assigned_to_id, assigned_to_name, status, deadline, contribution_percent)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          taskId,
-          projectId,
-          title,
-          String(task?.description || '').trim() || null,
-          String(task?.assignedToId || '').trim() || null,
-          String(task?.assignedToName || '').trim() || null,
-          String(task?.status || 'pending').trim() || 'pending',
-          normalizeDateOrNull(task?.deadline),
-          Math.min(100, Math.max(0, Number(task?.contributionPercent || 0)))
-        ]
-      );
-    }
-
-    const [rows] = await connection.query(
-      'SELECT * FROM project_tasks WHERE project_id = ? ORDER BY created_at ASC',
-      [projectId]
-    );
-    await connection.commit();
-    connection.release();
-    return res.json({ ok: true, tasks: rows.map(toSafeProjectTask) });
-  } catch (error) {
-    if (connection) {
-      await connection.rollback().catch(() => {});
-      connection.release();
-    }
-    return sendServerError(res, error);
-  }
-});
-
-app.get('/api/projects/:projectId/files', async (req, res) => {
-  const projectId = String(req.params.projectId || '').trim();
-  if (!projectId) {
-    return res.status(400).json({ ok: false, error: 'projectId is required' });
-  }
-
-  try {
-    const pool = getPool();
-    if (!await canAccessProject(pool, req, projectId)) {
-      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
-    }
-    const [rows] = await pool.query(
-      'SELECT * FROM project_files WHERE project_id = ? ORDER BY created_at ASC',
-      [projectId]
-    );
-    return res.json({ ok: true, files: rows.map(toSafeProjectFile) });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.post('/api/projects/:projectId/files/:fileId/content', requireRoles('student', 'faculty', 'admin'), projectFileUpload.single('file'), async (req, res) => {
-  const projectId = String(req.params.projectId || '').trim();
-  const fileId = String(req.params.fileId || '').trim();
-  if (!projectId || !fileId || !req.file) {
-    if (req.file?.path) safeUnlink(req.file.path);
-    return res.status(400).json({ ok: false, error: 'projectId, fileId, and file are required.' });
-  }
-
-  try {
-    const pool = getPool();
-    if (!await canAccessProject(pool, req, projectId)) {
-      safeUnlink(req.file.path);
-      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
-    }
-    return res.json({ ok: true });
-  } catch (error) {
-    safeUnlink(req.file.path);
-    return sendServerError(res, error);
-  }
-});
-
-app.get('/api/projects/:projectId/files/:fileId/content', async (req, res) => {
-  const projectId = String(req.params.projectId || '').trim();
-  const fileId = String(req.params.fileId || '').trim();
-  try {
-    const pool = getPool();
-    if (!await canAccessProject(pool, req, projectId)) {
-      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
-    }
-    const [rows] = await pool.query(
-      'SELECT file_name, mime_type FROM project_files WHERE project_id = ? AND id = ? LIMIT 1',
-      [projectId, fileId]
-    );
-    if (!rows.length) {
-      return res.status(404).json({ ok: false, error: 'File metadata was not found.' });
-    }
-    const filePath = path.join(projectFilesDir, fileId);
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ ok: false, error: 'File content is not available.' });
-    }
-    await pool.query(
-      'UPDATE project_files SET download_count = download_count + 1 WHERE project_id = ? AND id = ?',
-      [projectId, fileId]
-    );
-    res.type(rows[0].mime_type || 'application/octet-stream');
-    return res.download(filePath, path.basename(rows[0].file_name));
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.put('/api/projects/:projectId/files', requireRoles('student', 'faculty', 'admin'), async (req, res) => {
-  const projectId = String(req.params.projectId || '').trim();
-  const files = Array.isArray(req.body?.files) ? req.body.files : null;
-
-  if (!projectId) {
-    return res.status(400).json({ ok: false, error: 'projectId is required' });
-  }
-
-  if (!files) {
-    return res.status(400).json({ ok: false, error: 'files array is required' });
-  }
-
-  let connection;
-  try {
-    const pool = getPool();
-    if (!await canAccessProject(pool, req, projectId)) {
-      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
-    }
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-    await connection.query('DELETE FROM project_files WHERE project_id = ?', [projectId]);
-
-    for (const file of files) {
-      const fileId = String(file?.id || `FILE-${Date.now()}-${Math.floor(Math.random() * 1000)}`).trim();
-      const fileName = String(file?.fileName || '').trim();
-      if (!fileName) {
-        // eslint-disable-next-line no-continue
-        continue;
-      }
-
-      await connection.query(
-        `INSERT INTO project_files
-         (id, project_id, file_name, file_size, file_type, mime_type, uploaded_by, uploaded_by_name, uploaded_date, version, description, download_count, is_submitted, submitted_date, updated_date)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          fileId,
-          projectId,
-          fileName,
-          Number(file?.fileSize || 0),
-          String(file?.fileType || 'other').trim() || 'other',
-          String(file?.mimeType || '').trim() || null,
-          String(file?.uploadedBy || '').trim() || null,
-          String(file?.uploadedByName || '').trim() || null,
-          normalizeDateOrNull(file?.uploadedDate),
-          Math.max(1, Number(file?.version || 1)),
-          String(file?.description || '').trim() || null,
-          Math.max(0, Number(file?.downloadCount || 0)),
-          file?.isSubmitted ? 1 : 0,
-          normalizeDateOrNull(file?.submittedDate),
-          normalizeDateOrNull(file?.updatedDate)
-        ]
-      );
-    }
-
-    const [rows] = await connection.query(
-      'SELECT * FROM project_files WHERE project_id = ? ORDER BY created_at ASC',
-      [projectId]
-    );
-    await connection.commit();
-    connection.release();
-    return res.json({ ok: true, files: rows.map(toSafeProjectFile) });
-  } catch (error) {
-    if (connection) {
-      await connection.rollback().catch(() => {});
-      connection.release();
-    }
-    return sendServerError(res, error);
-  }
-});
-
-app.get('/api/projects/:projectId/feedback-corrections', async (req, res) => {
-  const projectId = String(req.params.projectId || '').trim();
-  if (!projectId) {
-    return res.status(400).json({ ok: false, error: 'projectId is required' });
-  }
-
-  try {
-    const pool = getPool();
-    if (!await canAccessProject(pool, req, projectId)) {
-      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
-    }
-    const [rows] = await pool.query(
-      'SELECT * FROM project_feedback_corrections WHERE project_id = ? ORDER BY created_at DESC',
-      [projectId]
-    );
-    return res.json({ ok: true, corrections: rows.map(toSafeFeedbackCorrection) });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.post('/api/projects/:projectId/feedback-corrections', requireRoles('faculty', 'admin'), async (req, res) => {
-  const projectId = String(req.params.projectId || '').trim();
-  const studentIdentifier = String(req.body?.studentIdentifier || '').trim();
-  const note = String(req.body?.note || '').trim();
-
-  if (!projectId) {
-    return res.status(400).json({ ok: false, error: 'projectId is required' });
-  }
-
-  if (!note) {
-    return res.status(400).json({ ok: false, error: 'note is required' });
-  }
-
-  try {
-    const pool = getPool();
-    if (!await canAccessProject(pool, req, projectId)) {
-      return res.status(403).json({ ok: false, error: 'You are not authorized to access this project.' });
-    }
-    const correctionId = `CORR-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    await pool.query(
-      `INSERT INTO project_feedback_corrections (id, project_id, student_identifier, note)
-       VALUES (?, ?, ?, ?)`,
-      [correctionId, projectId, studentIdentifier || null, note]
-    );
-
-    const [rows] = await pool.query(
-      'SELECT * FROM project_feedback_corrections WHERE id = ? LIMIT 1',
-      [correctionId]
-    );
-
-    return res.status(201).json({ ok: true, correction: toSafeFeedbackCorrection(rows[0]) });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.post('/api/admin/assign-student-faculty', requireRoles('admin'), async (req, res) => {
-  const studentIdentifier = String(req.body?.studentIdentifier || '').trim();
-  const facultyIdentifier = String(req.body?.facultyIdentifier || '').trim();
-
-  if (!studentIdentifier || !facultyIdentifier) {
-    return res.status(400).json({ ok: false, error: 'studentIdentifier and facultyIdentifier are required' });
-  }
-
-  try {
-    const pool = getPool();
-    const student = await findUserByIdentifierOrEmail(pool, studentIdentifier);
-    const faculty = await findUserByIdentifierOrEmail(pool, facultyIdentifier);
-
-    if (!student || String(student.role || '').toLowerCase() !== 'student') {
-      return res.status(404).json({ ok: false, error: 'Student account not found' });
-    }
-
-    if (!faculty || String(faculty.role || '').toLowerCase() !== 'faculty') {
-      return res.status(404).json({ ok: false, error: 'Faculty account not found' });
-    }
-
-    await pool.query(
-      'UPDATE users SET assigned_faculty_identifier = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [faculty.identifier, student.id]
-    );
-
-    return res.json({
-      ok: true,
-      assignment: {
-        studentIdentifier: student.identifier,
-        studentName: student.name,
-        facultyIdentifier: faculty.identifier,
-        facultyName: faculty.name
-      }
-    });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.get('/api/admin/student-faculty-assignments', requireRoles('admin'), async (_req, res) => {
-  try {
-    const pool = getPool();
-    const [rows] = await pool.query(`
-      SELECT
-        s.identifier AS student_identifier,
-        s.name AS student_name,
-        s.assigned_faculty_identifier AS faculty_identifier,
-        f.name AS faculty_name
-      FROM users s
-      LEFT JOIN users f ON s.assigned_faculty_identifier = f.identifier
-      WHERE s.role = 'student'
-      ORDER BY s.identifier ASC
-    `);
-
-    const assignments = rows
-      .filter((row) => row.faculty_identifier)
-      .map((row) => ({
-        studentIdentifier: row.student_identifier,
-        studentName: row.student_name,
-        facultyIdentifier: row.faculty_identifier,
-        facultyName: row.faculty_name || 'Unknown Faculty'
-      }));
-
-    return res.json({ ok: true, assignments });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.get('/api/profile/:identifier', async (req, res) => {
-  const normalizedIdentifier = String(req.params.identifier || '').trim();
-  if (!normalizedIdentifier) {
-    return res.status(400).json({ ok: false, error: 'identifier is required' });
-  }
-  if (!isSelfOrAdmin(req, normalizedIdentifier)) {
-    return res.status(403).json({ ok: false, error: 'You can only view your own profile.' });
-  }
-
-  try {
-    const pool = getPool();
-    const user = await findUserByIdentifierOrEmail(pool, normalizedIdentifier);
-    if (!user) {
-      return res.status(404).json({ ok: false, error: 'User profile not found' });
-    }
-
-    return res.json({ ok: true, user: toSafeUser(user) });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.patch('/api/profile/:identifier', async (req, res) => {
-  const normalizedIdentifier = String(req.params.identifier || '').trim();
-  if (!normalizedIdentifier) {
-    return res.status(400).json({ ok: false, error: 'identifier is required' });
-  }
-  if (!isSelfOrAdmin(req, normalizedIdentifier)) {
-    return res.status(403).json({ ok: false, error: 'You can only update your own profile.' });
-  }
-
-  const updates = [];
-  const params = [];
-  const adminOnlyFields = new Set([
-    'accessLevel',
-    'permissions',
-    'isActive',
-    'twoFactorEnabled',
-    'emergencyContact'
-  ]);
-
-  Object.keys(req.body || {}).forEach((inputKey) => {
-    const dbField = PROFILE_FIELD_MAP[inputKey];
-    if (!dbField || (adminOnlyFields.has(inputKey) && String(req.auth.role).toLowerCase() !== 'admin')) {
-      return;
-    }
-
-    const dbValue = toDbPatchValue(inputKey, req.body[inputKey]);
-    if (dbValue === undefined) {
-      return;
-    }
-
-    updates.push(`${dbField} = ?`);
-    params.push(dbValue);
-  });
-
-  if (updates.length === 0) {
-    return res.status(400).json({ ok: false, error: 'No valid profile fields provided' });
-  }
-
-  try {
-    const pool = getPool();
-    params.push(normalizedIdentifier);
-    await pool.query(
-      `UPDATE users SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE LOWER(identifier) = LOWER(?)`,
-      params
-    );
-
-    const updatedUser = await findUserByIdentifierOrEmail(pool, normalizedIdentifier);
-    if (!updatedUser) {
-      return res.status(404).json({ ok: false, error: 'User profile not found after update' });
-    }
-
-    await syncUserIntoRoleTables(pool, updatedUser);
-
-    return res.json({ ok: true, user: toSafeUser(updatedUser) });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.post('/api/auth/login', loginRateLimiter, async (req, res) => {
-  const { identifier, password } = req.body;
-
-  if (!identifier || !password) {
-    return res.status(400).json({ ok: false, error: 'identifier and password are required' });
-  }
-
-  try {
-    const pool = getPool();
-    const user = await findUserByIdentifierOrEmail(pool, identifier);
-
-    if (!user) {
-      return res.status(401).json({ ok: false, error: 'Invalid credentials' });
-    }
-    if (!user.is_active) {
-      return res.status(403).json({ ok: false, error: 'This account is inactive.' });
-    }
-
-    const isPasswordValid = await verifyPasswordAndMigrate(pool, user, password);
-    if (!isPasswordValid) {
-      return res.status(401).json({ ok: false, error: 'Invalid credentials' });
-    }
-
-    if (user.role === 'faculty' || user.role === 'admin') {
-      const userKey = `${user.role}-${user.identifier}`;
-      const otpCode = issueUniqueOtp(userKey);
-      const otpSessionId = `otp-${user.identifier}-${Date.now()}`;
-      const expiresAt = Date.now() + OTP_SESSION_TTL_MS;
-      if (!await deliverOtp(user, otpCode, expiresAt)) {
-        return res.status(503).json({
-          ok: false,
-          error: 'Multi-factor authentication is temporarily unavailable.'
-        });
-      }
-
-      otpSessions.set(otpSessionId, {
-        user,
-        role: user.role,
-        userKey,
-        otpCode,
-        expiresAt,
-        attempts: 0,
-        resendCount: 0,
-        lastResendTime: 0
-      });
-
-      return res.json({
-        ok: true,
-        requiresOtp: true,
-        otpSessionId,
-        maskedPhone: maskPhone(user.phone),
-        role: user.role,
-        expiresAt
-      });
-    }
-
-    const token = createAuthToken(user);
-    return res.json({
-      ok: true,
-      requiresOtp: false,
-      token,
-      user: toSafeUser(user)
-    });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.post('/api/auth/verify-otp', sensitiveAuthRateLimiter, (req, res) => {
-  const { otpSessionId, otpCode } = req.body;
-
-  if (!otpSessionId || !otpCode) {
-    return res.status(400).json({ ok: false, error: 'otpSessionId and otpCode are required' });
-  }
-
-  const session = otpSessions.get(otpSessionId);
-  if (!session) {
-    return res.status(400).json({ ok: false, error: 'OTP session expired. Please login again.' });
-  }
-
-  if (Date.now() > session.expiresAt) {
-    otpSessions.delete(otpSessionId);
-    return res.status(400).json({ ok: false, error: 'OTP expired. Please login again.' });
-  }
-
-  session.attempts += 1;
-  if (String(session.otpCode) !== String(otpCode).trim()) {
-    if (session.attempts >= MAX_OTP_ATTEMPTS) {
-      otpSessions.delete(otpSessionId);
-      return res.status(400).json({ ok: false, error: 'Too many invalid OTP attempts. Please login again.' });
-    }
-    return res.status(400).json({ ok: false, error: 'Invalid OTP code' });
-  }
-
-  otpSessions.delete(otpSessionId);
-  const token = createAuthToken(session.user);
-
-  return res.json({
-    ok: true,
-    token,
-    user: toSafeUser(session.user)
-  });
-});
-
-app.post('/api/auth/resend-otp', sensitiveAuthRateLimiter, async (req, res) => {
-  const { otpSessionId } = req.body;
-
-  if (!otpSessionId) {
-    return res.status(400).json({ ok: false, error: 'otpSessionId is required' });
-  }
-
-  const session = otpSessions.get(otpSessionId);
-  if (!session) {
-    return res.status(400).json({ ok: false, error: 'OTP session expired. Please login again with credentials.' });
-  }
-
-  if (session.resendCount >= 3) {
-    return res.status(400).json({ ok: false, error: 'Maximum resend attempts reached. Please login again.' });
-  }
-
-  const now = Date.now();
-  if (session.lastResendTime && now - session.lastResendTime < 30000) {
-    const secondsRemaining = Math.ceil((30000 - (now - session.lastResendTime)) / 1000);
-    return res.status(400).json({ ok: false, error: `Please wait ${secondsRemaining} seconds before requesting another OTP.` });
-  }
-
-  const newOtpCode = issueUniqueOtp(session.userKey, session.otpCode);
-  const expiresAt = Date.now() + OTP_SESSION_TTL_MS;
-  if (!await deliverOtp(session.user, newOtpCode, expiresAt)) {
-    return res.status(503).json({
-      ok: false,
-      error: 'Multi-factor authentication is temporarily unavailable.'
-    });
-  }
-  session.otpCode = newOtpCode;
-  session.expiresAt = expiresAt;
-  session.resendCount += 1;
-  session.lastResendTime = Date.now();
-
-  otpSessions.set(otpSessionId, session);
-
-  return res.json({
-    ok: true,
-    otpSent: true,
-    maskedPhone: maskPhone(session.user.phone),
-    expiresAt: session.expiresAt,
-    resendCount: session.resendCount,
-    remainingAttempts: 3 - session.resendCount
-  });
-});
-
-app.post('/api/auth/forgot-password', sensitiveAuthRateLimiter, async (req, res) => {
-  const { identifier } = req.body;
-  const normalizedIdentifier = String(identifier || '').trim();
-
-  if (!normalizedIdentifier) {
-    return res.status(400).json({ ok: false, error: 'Enter your identifier or email first.' });
-  }
-
-  try {
-    const pool = getPool();
-    const user = await findUserByIdentifierOrEmail(pool, normalizedIdentifier);
-
-    if (user) {
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const expiresAt = Date.now() + (15 * 60 * 1000);
-      if (!await deliverPasswordReset(user, resetToken, expiresAt)) {
-        console.error('Password reset delivery is unavailable.');
-        return res.json({
-          ok: true,
-          success: true,
-          message: 'If the account exists, password reset instructions have been sent.'
-        });
-      }
-      passwordResetTokens.set(resetToken, {
-        userId: user.id,
-        expiresAt
-      });
-      return res.json({
-        ok: true,
-        success: true,
-        message: 'If the account exists, password reset instructions have been sent.'
-      });
-    }
-
-    return res.json({
-      ok: true,
-      success: true,
-      message: 'If the account exists, password reset instructions have been sent.'
-    });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.post('/api/auth/reset-initial-password', async (req, res) => {
-  const { identifier, newPassword } = req.body;
-  const normalizedIdentifier = String(identifier || '').trim();
-
-  if (!normalizedIdentifier || !newPassword) {
-    return res.status(400).json({ ok: false, error: 'identifier and newPassword are required' });
-  }
-
-  const passwordErrors = validatePasswordStrength(String(newPassword));
-  if (passwordErrors.length > 0) {
-    return res.status(400).json({ ok: false, error: passwordErrors.join('. ') });
-  }
-
-  try {
-    const pool = getPool();
-    if (!isSelfOrAdmin(req, normalizedIdentifier)) {
-      return res.status(403).json({ ok: false, error: 'You can only reset your own password.' });
-    }
-    const user = await findUserByIdentifierOrEmail(pool, normalizedIdentifier);
-    if (!user) {
-      return res.status(404).json({ ok: false, error: 'User not found' });
-    }
-
-    const passwordHash = await bcrypt.hash(String(newPassword), BCRYPT_SALT_ROUNDS);
-    await pool.query(
-      `UPDATE users
-       SET password = ?, must_reset_password = 0, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [passwordHash, user.id]
-    );
-
-    const updatedUser = await findUserByIdentifierOrEmail(pool, normalizedIdentifier);
-    if (updatedUser) {
-      await syncUserIntoRoleTables(pool, updatedUser);
-    }
-    return res.json({ ok: true, user: toSafeUser(updatedUser) });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.post('/api/auth/reset-password', sensitiveAuthRateLimiter, async (req, res) => {
-  const { resetToken, newPassword } = req.body || {};
-  const passwordErrors = validatePasswordStrength(String(newPassword || ''));
-  if (!resetToken || passwordErrors.length > 0) {
-    return res.status(400).json({
-      ok: false,
-      error: passwordErrors.length > 0 ? passwordErrors.join('. ') : 'resetToken and newPassword are required'
-    });
-  }
-
-  const tokenRecord = takePasswordResetToken(resetToken);
-  if (!tokenRecord) {
-    return res.status(400).json({ ok: false, error: 'Reset token is invalid or expired.' });
-  }
-
-  try {
-    const pool = getPool();
-    const passwordHash = await bcrypt.hash(String(newPassword), BCRYPT_SALT_ROUNDS);
-    await pool.query(
-      'UPDATE users SET password = ?, must_reset_password = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [passwordHash, tokenRecord.userId]
-    );
-    return res.json({ ok: true, message: 'Password reset successfully.' });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.post('/api/auth/signup', async (req, res) => {
-  const { name, email, password, role = 'student', department, phone } = req.body;
-
-  if (!name || !email || !password) {
-    return res.status(400).json({ ok: false, error: 'name, email and password are required' });
-  }
-
-  const normalizedRole = String(role).trim().toLowerCase();
-  if (normalizedRole !== 'student') {
-    return res.status(403).json({ ok: false, error: 'Public signup is limited to student accounts.' });
-  }
-  const passwordErrors = validatePasswordStrength(String(password));
-  if (passwordErrors.length > 0) {
-    return res.status(400).json({ ok: false, error: passwordErrors.join('. ') });
-  }
-
-  try {
-    const pool = getPool();
-    const identifier = await generateIdentifierForRole(pool, normalizedRole);
-    const passwordHash = await bcrypt.hash(String(password), BCRYPT_SALT_ROUNDS);
-
-    await pool.query(
-      `INSERT INTO users (identifier, name, email, role, department, phone, must_reset_password, password)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
-      [
-        identifier,
-        String(name).trim(),
-        String(email).trim().toLowerCase(),
-        normalizedRole,
-        String(department || '').trim() || null,
-        String(phone || '').trim() || null,
-        0,
-        passwordHash
-      ]
-    );
-
-    const createdUser = await findUserByIdentifierOrEmail(pool, identifier);
-    if (createdUser) {
-      await syncUserIntoRoleTables(pool, createdUser);
-    }
-    const token = createAuthToken(createdUser);
-
-    return res.status(201).json({
-      ok: true,
-      token,
-      user: toSafeUser(createdUser)
-    });
-  } catch (error) {
-    if (error && error.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ ok: false, error: 'User already exists with this identifier or email.' });
-    }
-    return sendServerError(res, error);
-  }
-});
-
-app.post('/api/auth/verify-token', (req, res) => {
-  const { token } = req.body;
-
-  if (!token) {
-    return res.status(400).json({ ok: false, error: 'Token is required.' });
-  }
-
-  try {
-    const decoded = jwt.verify(String(token).trim(), JWT_SECRET);
-    return res.json({ ok: true, decoded });
-  } catch (error) {
-    return res.status(401).json({ ok: false, error: 'Invalid or expired token.' });
-  }
-});
-
-app.post('/api/users', requireRoles('admin'), async (req, res) => {
-  const { identifier, name, email, role, department, phone, password } = req.body;
-
-  if (!identifier || !name || !email || !role || !password) {
-    return res.status(400).json({
-      ok: false,
-      error: 'identifier, name, email, role and password are required'
-    });
-  }
-
-  const normalizedRole = String(role).trim().toLowerCase();
-  if (!['student', 'faculty'].includes(normalizedRole)) {
-    return res.status(400).json({ ok: false, error: 'Admin-created role must be student or faculty.' });
-  }
-  const passwordErrors = validatePasswordStrength(String(password));
-  if (passwordErrors.length > 0) {
-    return res.status(400).json({ ok: false, error: passwordErrors.join('. ') });
-  }
-
-  try {
-    const pool = getPool();
-    const passwordHash = await bcrypt.hash(String(password), BCRYPT_SALT_ROUNDS);
-    await pool.query(
-      `INSERT INTO users (identifier, name, email, role, department, phone, must_reset_password, password)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
-      [
-        String(identifier).trim().toUpperCase(),
-        String(name).trim(),
-        String(email).trim().toLowerCase(),
-        normalizedRole,
-        String(department || '').trim() || null,
-        String(phone || '').trim() || null,
-        1,
-        passwordHash
-      ]
-    );
-
-    const createdUser = await findUserByIdentifierOrEmail(pool, String(identifier).trim().toUpperCase());
-    if (createdUser) {
-      await syncUserIntoRoleTables(pool, createdUser);
-    }
-
-    return res.status(201).json({
-      ok: true,
-      message: 'User created in MySQL',
-      user: {
-        identifier: String(identifier).trim().toUpperCase(),
-        name: String(name).trim(),
-        email: String(email).trim().toLowerCase(),
-        role: String(role).trim().toLowerCase(),
-        department: String(department || '').trim() || null,
-        phoneNumber: String(phone || '').trim() || null
-      }
-    });
-  } catch (error) {
-    if (error && error.code === 'ER_DUP_ENTRY') {
-      return res.status(409).json({ ok: false, error: 'User already exists with this identifier or email.' });
-    }
-    return sendServerError(res, error);
-  }
-});
-
-// ========== DASHBOARD STATS ENDPOINTS ==========
-app.get('/api/stats/dashboard', requireRoles('admin'), async (_req, res) => {
-  try {
-    const pool = getPool();
-    const [studentCount] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = ?', ['student']);
-    const [facultyCount] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = ?', ['faculty']);
-    const [adminCount] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = ?', ['admin']);
-    const [totalUsers] = await pool.query('SELECT COUNT(*) as count FROM users');
-
-    return res.json({
-      ok: true,
-      stats: {
-        totalUsers: totalUsers[0]?.count || 0,
-        students: studentCount[0]?.count || 0,
-        faculty: facultyCount[0]?.count || 0,
-        admins: adminCount[0]?.count || 0
-      }
-    });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-// ========== FILE UPLOAD ENDPOINTS ==========
-app.post('/api/upload/profile-photo/:identifier', uploadMiddleware.single('profilePhoto'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ ok: false, error: 'No file provided' });
-    }
-
-    const { identifier } = req.params;
-    if (!identifier) {
-      safeUnlink(req.file.path);
-      return res.status(400).json({ ok: false, error: 'Identifier is required' });
-    }
-    if (!isSelfOrAdmin(req, identifier)) {
-      safeUnlink(req.file.path);
-      return res.status(403).json({ ok: false, error: 'You can only upload your own profile photo.' });
-    }
-    if (!hasValidImageSignature(req.file.path)) {
-      safeUnlink(req.file.path);
-      return res.status(400).json({ ok: false, error: 'The uploaded file is not a valid image.' });
-    }
-
-    const pool = getPool();
-    const [rows] = await pool.query(
-      'SELECT photo_url FROM users WHERE LOWER(identifier) = LOWER(?) LIMIT 1',
-      [identifier]
-    );
-    if (!rows[0]) {
-      safeUnlink(req.file.path);
-      return res.status(404).json({ ok: false, error: 'User profile not found.' });
-    }
-    const previousPhotoPath = rows[0].photo_url;
-    const photoUrl = `/uploads/profile-photos/${req.file.filename}`;
-
-    // Update user with photo URL
-    await pool.query(
-      'UPDATE users SET photo_url = ?, updated_at = NOW() WHERE identifier = ?',
-      [photoUrl, identifier]
-    );
-    if (previousPhotoPath && path.basename(previousPhotoPath) !== req.file.filename) {
-      safeUnlink(path.join(uploadsDir, path.basename(previousPhotoPath)));
-    }
-
-    return res.json({
-      ok: true,
-      message: 'Profile photo uploaded successfully',
-      photoUrl: createPhotoUrl(photoUrl)
-    });
-  } catch (error) {
-    if (req.file && req.file.path) {
-      safeUnlink(req.file.path);
-    }
-    return sendServerError(res, error);
-  }
-});
-
-app.get('/api/profile-photo/:identifier', async (req, res) => {
-  try {
-    const { identifier } = req.params;
-    if (!isSelfOrAdmin(req, identifier)) {
-      return res.status(403).json({ ok: false, error: 'You can only view your own profile photo.' });
-    }
-    const pool = getPool();
-
-    const [rows] = await pool.query(
-      'SELECT photo_url FROM users WHERE identifier = ?',
-      [identifier]
-    );
-
-    if (!rows[0] || !rows[0].photo_url) {
-      return res.status(404).json({ ok: false, error: 'Photo not found' });
-    }
-
-    return res.json({
-      ok: true,
-      photoUrl: createPhotoUrl(rows[0].photo_url)
-    });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.delete('/api/profile-photo/:identifier', async (req, res) => {
-  try {
-    const { identifier } = req.params;
-    if (!isSelfOrAdmin(req, identifier)) {
-      return res.status(403).json({ ok: false, error: 'You can only delete your own profile photo.' });
-    }
-    const pool = getPool();
-
-    const [rows] = await pool.query(
-      'SELECT photo_url FROM users WHERE identifier = ?',
-      [identifier]
-    );
-
-    if (rows[0]?.photo_url) {
-      safeUnlink(path.join(uploadsDir, path.basename(String(rows[0].photo_url))));
-    }
-
-    await pool.query(
-      'UPDATE users SET photo_url = NULL, updated_at = NOW() WHERE identifier = ?',
-      [identifier]
-    );
-
-    return res.json({
-      ok: true,
-      message: 'Profile photo deleted successfully'
-    });
-  } catch (error) {
-    return sendServerError(res, error);
-  }
-});
-
-app.use((error, _req, res, next) => {
-  if (error instanceof multer.MulterError || String(error.message || '').startsWith('Invalid file type')) {
-    return res.status(400).json({ ok: false, error: error.message || 'Invalid upload.' });
-  }
-  console.error(error);
-  return next(error);
-});
-
-app.use((error, _req, res, _next) => {
-  console.error(error);
-  return res.status(500).json({ ok: false, error: 'An unexpected server error occurred.' });
-});
+app.use('/api/upload/profile-photo', profilePhotoRouters.uploadRouter);
+app.use('/api/profile-photo', profilePhotoRouters.photoRouter);
+
+app.use('/api/auth', createAuthRouter({
+  loginRateLimiter,
+  sensitiveAuthRateLimiter,
+  getPool,
+  findUserByIdentifierOrEmail,
+  isAccountActive,
+  verifyPasswordAndMigrate,
+  issueUniqueOtp,
+  otpSessionTtlMs: OTP_SESSION_TTL_MS,
+  deliverOtp,
+  otpSessions,
+  maskPhone,
+  createAuthToken,
+  toSafeUser,
+  sendServerError,
+  maxOtpAttempts: MAX_OTP_ATTEMPTS,
+  deliverPasswordReset,
+  passwordResetTokens,
+  validatePasswordStrength,
+  isSelfOrAdmin,
+  bcrypt,
+  bcryptSaltRounds: BCRYPT_SALT_ROUNDS,
+  withTransaction,
+  syncUserIntoRoleTables,
+  updateRoleTablePassword,
+  takePasswordResetToken,
+  generateIdentifierForRole,
+  verifyAuthToken,
+  loadAuthIdentity: (identifier) => authIdentityProvider(identifier)
+}));
+// ========== CENTRAL ERROR HANDLERS ==========
+app.use(...createErrorHandlers(multer.MulterError));
 
 async function bootstrapData() {
   await ensureRoleTables();
   await ensureProjectsTable();
   await ensureProjectWorkspaceTables();
+  await ensureProjectFileContentKeyColumn();
+  await recoverProjectFileContent();
   await ensureStudentFacultyAssignmentColumn();
   await ensureDefaultAdmin();
   await ensureTempWorkspaceSeed();
 }
 
 if (require.main === module) {
+  assertApprovedDatabaseTarget(process.env);
   if (!JWT_SECRET || JWT_SECRET.length < 32) {
     throw new Error('JWT_SECRET must be configured with at least 32 characters before starting the server.');
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-
-  bootstrapData().catch((error) => {
-    console.error(`Failed during bootstrap: ${error.message}`);
+  bootstrapData().then(() => {
+    app.listen(PORT, getHost(), () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  }).catch((_error) => {
+    console.error('Application bootstrap failed.');
+    process.exitCode = 1;
   });
 }
 
@@ -2290,7 +1661,29 @@ module.exports = {
     otpSessions,
     passwordResetTokens,
     takePasswordResetToken,
+    verifyAuthToken,
+    setAuthIdentityProvider,
+    setDatabasePoolProvider,
     deliverWebhookMessage,
-    deliverOtp
+    deliverOtp,
+    canAccessProject,
+    createProjectAccessMiddleware,
+    getProjectFileStorageName,
+    getLegacyProjectFilePath,
+    resolveProjectFilePath,
+    isValidProjectFile,
+    getProjectFileContentPath,
+    getProjectFileTransactionMarkerPath,
+    getProjectFileContentDir: () => projectFilesContentDir,
+    listPendingProjectFiles,
+    stageProjectFile,
+    recoverProjectFileContent,
+    setProjectFilePoolProvider,
+    ensureRoleTables,
+    ensureDefaultAdmin,
+    ensureProjectWorkspaceTables,
+    ensureProjectFileContentKeyColumn,
+    getHost,
+    syncUserIntoRoleTables
   }
 };

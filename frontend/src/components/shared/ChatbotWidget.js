@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { sendChatMessage } from '../../services/chatService';
 import './ChatbotWidget.css';
@@ -10,6 +10,7 @@ const suggestions = [
   'How can I view feedback?',
   'How do I update my profile?'
 ];
+const MAX_HISTORY_MESSAGES = 10;
 
 function ChatbotWidget() {
   const { user } = useAuth();
@@ -21,12 +22,15 @@ function ChatbotWidget() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [retryMessage, setRetryMessage] = useState('');
+  const requestInFlight = useRef(false);
 
   if (!user) {
     return null;
   }
 
   const requestAnswer = async (content, history) => {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     setLoading(true);
     setError('');
     try {
@@ -37,18 +41,19 @@ function ChatbotWidget() {
       setError(requestError.message || 'Unable to contact the assistant.');
       setRetryMessage(content);
     } finally {
+      requestInFlight.current = false;
       setLoading(false);
     }
   };
 
   const sendContent = async (content) => {
     const trimmedContent = content.trim();
-    if (!trimmedContent || loading) {
+    if (!trimmedContent || requestInFlight.current) {
       return;
     }
 
     setInput('');
-    const history = messages;
+    const history = messages.slice(-MAX_HISTORY_MESSAGES);
     setMessages((current) => [...current, { role: 'user', content: trimmedContent }]);
     await requestAnswer(trimmedContent, history);
   };
@@ -59,10 +64,14 @@ function ChatbotWidget() {
   };
 
   const retryLastMessage = async () => {
-    if (!retryMessage || loading) {
+    if (!retryMessage || requestInFlight.current) {
       return;
     }
-    await requestAnswer(retryMessage, messages);
+    const lastMessage = messages[messages.length - 1];
+    const history = lastMessage?.role === 'user' && lastMessage.content === retryMessage
+      ? messages.slice(0, -1)
+      : messages;
+    await requestAnswer(retryMessage, history.slice(-MAX_HISTORY_MESSAGES));
   };
 
   const handleKeyDown = (event) => {
@@ -100,7 +109,7 @@ function ChatbotWidget() {
               <div className="chatbot-error">
                 <span>{error}</span>
                 <span>
-                  {retryMessage ? <button type="button" onClick={retryLastMessage}>Retry</button> : null}
+                  {retryMessage ? <button type="button" onClick={retryLastMessage} disabled={loading}>Retry</button> : null}
                   <button type="button" onClick={() => setError('')}>Dismiss</button>
                 </span>
               </div>
@@ -118,7 +127,15 @@ function ChatbotWidget() {
               aria-label="Chat message"
             />
             <div className="chatbot-actions">
-              <button type="button" onClick={() => setMessages([{ role: 'assistant', content: 'Chat cleared. How can I help?' }])}>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  setMessages([{ role: 'assistant', content: 'Chat cleared. How can I help?' }]);
+                  setError('');
+                  setRetryMessage('');
+                }}
+              >
                 Clear
               </button>
               <button type="submit" disabled={loading || !input.trim()}>Send</button>

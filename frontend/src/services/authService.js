@@ -1,5 +1,29 @@
 import { BASE_URL as API_BASE_URL } from '../config/api';
 
+export const AUTH_EXPIRED_EVENT = 'student-portal:auth-expired';
+
+function matchesStoredSessionToken(failedToken) {
+  if (!failedToken || sessionStorage.getItem('student-portal-token') !== failedToken) {
+    return false;
+  }
+  try {
+    const session = JSON.parse(sessionStorage.getItem('student-portal-session') || 'null');
+    return session?.token === failedToken;
+  } catch (_error) {
+    return false;
+  }
+}
+
+export function handleExpiredAuthentication(failedToken) {
+  if (!matchesStoredSessionToken(failedToken)) return false;
+  sessionStorage.removeItem('student-portal-session');
+  sessionStorage.removeItem('student-portal-token');
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+  }
+  return true;
+}
+
 function toNetworkError(error) {
   if (error instanceof TypeError) {
     return new Error(`Cannot reach API server at ${API_BASE_URL}. Start backend with "npm run dev" from project root.`);
@@ -19,6 +43,9 @@ function authFetch(url, options = {}) {
       ...(options.headers || {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {})
     }
+  }).then((response) => {
+    if (response.status === 401) handleExpiredAuthentication(token);
+    return response;
   });
 }
 
@@ -135,13 +162,13 @@ export async function signupUser(identifier, name, email, password, role = 'stud
 }
 
 export async function verifyToken(token) {
-  const response = await authFetch(`${API_BASE_URL}/api/auth/verify-token`, {
+  const tokenBeingVerified = String(token || '').trim();
+  const response = await fetch(`${API_BASE_URL}/api/auth/verify-token`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ token })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: tokenBeingVerified })
   });
+  if (response.status === 401) handleExpiredAuthentication(tokenBeingVerified);
 
   const payload = await parseResponse(response);
   return payload.decoded;

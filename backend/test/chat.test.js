@@ -1,18 +1,23 @@
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-secret-for-chat-tests';
 process.env.AI_API_KEY = 'test-key';
-process.env.AI_MODEL = 'gemini-2.0-flash';
+process.env.AI_MODEL = 'gemini-3.8-flash';
 process.env.AI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
-const { app } = require('../index');
+const { app, __test } = require('../index');
+
+const testIdentities = new Map();
+__test.setAuthIdentityProvider(async (identifier) => testIdentities.get(String(identifier).toLowerCase()) || null);
 
 function authorization(role = 'student') {
+  const identifier = `${role}-001`;
+  testIdentities.set(identifier.toLowerCase(), { identifier, role, is_active: 1 });
   const token = jwt.sign(
-    { sub: `${role}-001`, role, email: `${role}@test.local`, type: 'access' },
+    { sub: identifier, role, email: `${role}@test.local`, type: 'access' },
     process.env.JWT_SECRET,
     { expiresIn: '5m' }
   );
@@ -66,7 +71,7 @@ test('sends recent conversation history to the configured Gemini-compatible endp
 
     assert.equal(response.status, 200);
     assert.equal(response.body.message, 'Here is a dynamic follow-up answer.');
-    assert.equal(requestBody.model, 'gemini-2.0-flash');
+    assert.equal(requestBody.model, 'gemini-3.8-flash');
     assert.equal(requestBody.messages[0].role, 'system');
     assert.equal(requestBody.messages.at(-1).content, 'Can you explain that again?');
   } finally {
@@ -80,7 +85,7 @@ test('classifies provider request, authentication, model, quota, and server erro
     global.fetch = async () => ({ ok: false, status: 400, statusText: 'Bad Request', json: async () => ({ error: { message: 'Invalid model' } }) });
     const invalidModel = await request(app).post('/api/chat').set('Authorization', authorization()).send({ message: 'Hello' });
     assert.equal(invalidModel.status, 502);
-    assert.equal(invalidModel.body.error, 'The assistant request was rejected by the provider.');
+    assert.equal(invalidModel.body.error, 'The assistant provider rejected the request as invalid.');
 
     global.fetch = async () => ({ ok: false, status: 401, statusText: 'Unauthorized', json: async () => ({ error: { message: 'Invalid API key' } }) });
     const invalidKey = await request(app).post('/api/chat').set('Authorization', authorization()).send({ message: 'Hello' });
@@ -99,7 +104,7 @@ test('classifies provider request, authentication, model, quota, and server erro
 
     global.fetch = async () => ({ ok: false, status: 500, json: async () => ({}) });
     const failure = await request(app).post('/api/chat').set('Authorization', authorization()).send({ message: 'Hello' });
-    assert.equal(failure.status, 502);
+    assert.equal(failure.status, 503);
     assert.equal(failure.body.error, 'The assistant provider is temporarily unavailable.');
 
     global.fetch = async () => ({ ok: false, status: 429, json: async () => ({}) });
@@ -119,5 +124,48 @@ test('classifies provider request, authentication, model, quota, and server erro
   } finally {
     delete process.env.AI_TIMEOUT_MS;
     global.fetch = originalFetch;
+  }
+});
+
+test('retries transient provider failures with exponential backoff but not invalid requests', async () => {
+  const originalFetch = global.fetch;
+  const originalAttempts = process.env.AI_RETRY_ATTEMPTS;
+  const originalDelay = process.env.AI_RETRY_DELAY_MS;
+  process.env.AI_RETRY_ATTEMPTS = '2';
+  process.env.AI_RETRY_DELAY_MS = '0';
+  let attempts = 0;
+
+  try {
+    global.fetch = async () => {
+      attempts += 1;
+      if (attempts < 3) {
+        return { ok: false, status: 503, json: async () => ({ error: { message: 'temporary failure' } }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ choices: [{ message: { content: 'Recovered.' } }] }) };
+    };
+    const recovered = await request(app)
+      .post('/api/chat')
+      .set('Authorization', authorization())
+      .send({ message: 'Hello' });
+    assert.equal(recovered.status, 200);
+    assert.equal(attempts, 3);
+
+    attempts = 0;
+    global.fetch = async () => {
+      attempts += 1;
+      return { ok: false, status: 400, json: async () => ({ error: { message: 'invalid request' } }) };
+    };
+    const rejected = await request(app)
+      .post('/api/chat')
+      .set('Authorization', authorization())
+      .send({ message: 'Hello' });
+    assert.equal(rejected.status, 502);
+    assert.equal(attempts, 1);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalAttempts === undefined) delete process.env.AI_RETRY_ATTEMPTS;
+    else process.env.AI_RETRY_ATTEMPTS = originalAttempts;
+    if (originalDelay === undefined) delete process.env.AI_RETRY_DELAY_MS;
+    else process.env.AI_RETRY_DELAY_MS = originalDelay;
   }
 });

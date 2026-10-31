@@ -389,16 +389,17 @@ function StudentDashboard() {
   };
 
   const handleFilesUpdate = async (updatedFiles) => {
-    setProjectFiles(updatedFiles);
     if (!selectedProjectId) {
-      return;
+      return false;
     }
 
     try {
       const persistedFiles = await saveProjectFiles(selectedProjectId, updatedFiles);
       setProjectFiles(persistedFiles);
+      return true;
     } catch (error) {
       setWorkspaceNotice(`Could not save files: ${error.message}`);
+      return false;
     }
   };
 

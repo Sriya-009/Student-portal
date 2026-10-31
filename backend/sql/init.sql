@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS project_tasks (
 CREATE TABLE IF NOT EXISTS project_files (
   id VARCHAR(80) PRIMARY KEY,
   project_id VARCHAR(60) NOT NULL,
+  content_key VARCHAR(64) NULL,
   file_name VARCHAR(260) NOT NULL,
   file_size BIGINT NOT NULL DEFAULT 0,
   file_type VARCHAR(60) NULL,
@@ -166,6 +167,8 @@ CREATE TABLE IF NOT EXISTS project_files (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   INDEX idx_project_files_project (project_id)
 );
+
+ALTER TABLE project_files ADD COLUMN IF NOT EXISTS content_key VARCHAR(64) NULL;
 
 CREATE TABLE IF NOT EXISTS project_feedback_corrections (
   id VARCHAR(80) PRIMARY KEY,

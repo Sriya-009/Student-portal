@@ -1,4 +1,4 @@
-import { downloadProjectFile } from './authService';
+import { downloadProjectFile, getAllUsers, verifyToken } from './authService';
 
 test('downloads a successful file response as a Blob with the requested filename', async () => {
   const click = jest.fn();
@@ -47,4 +47,85 @@ test('reports backend download errors instead of creating a download', async () 
 
   await expect(downloadProjectFile('PROJECT-1', 'FILE-1', 'STUDENT.docx'))
     .rejects.toThrow('File content is not available.');
+});
+
+test('clears persisted credentials when an authenticated API request returns 401', async () => {
+  sessionStorage.setItem('student-portal-token', 'expired-token');
+  sessionStorage.setItem('student-portal-session', JSON.stringify({ token: 'expired-token', identifier: 'STU001' }));
+  global.fetch = jest.fn().mockResolvedValue({
+    status: 401,
+    ok: false,
+    json: async () => ({ error: 'Invalid or expired token.' })
+  });
+
+  await expect(getAllUsers()).rejects.toThrow('Invalid or expired token.');
+  expect(sessionStorage.getItem('student-portal-token')).toBeNull();
+  expect(sessionStorage.getItem('student-portal-session')).toBeNull();
+});
+
+test('does not clear the current session when verifyToken rejects a different token', async () => {
+  sessionStorage.setItem('student-portal-token', 'current-session-token');
+  sessionStorage.setItem('student-portal-session', JSON.stringify({ token: 'current-session-token', identifier: 'STU001' }));
+  global.fetch = jest.fn().mockResolvedValue({
+    status: 401,
+    ok: false,
+    json: async () => ({ error: 'Invalid or expired token.' })
+  });
+
+  await expect(verifyToken('unrelated-token')).rejects.toThrow('Invalid or expired token.');
+  expect(global.fetch).toHaveBeenCalledWith(
+    expect.stringContaining('/api/auth/verify-token'),
+    expect.objectContaining({ headers: { 'Content-Type': 'application/json' } })
+  );
+  expect(sessionStorage.getItem('student-portal-token')).toBe('current-session-token');
+  expect(JSON.parse(sessionStorage.getItem('student-portal-session')).token).toBe('current-session-token');
+});
+
+test('does not clear a newer session when an in-flight request using an older token returns 401', async () => {
+  sessionStorage.setItem('student-portal-token', 'old-session-token');
+  sessionStorage.setItem('student-portal-session', JSON.stringify({ token: 'old-session-token', identifier: 'STU001' }));
+  let rejectResponse;
+  global.fetch = jest.fn(() => new Promise((resolve) => { rejectResponse = resolve; }));
+
+  const pendingRequest = getAllUsers();
+  sessionStorage.setItem('student-portal-token', 'new-session-token');
+  sessionStorage.setItem('student-portal-session', JSON.stringify({ token: 'new-session-token', identifier: 'STU002' }));
+  rejectResponse({
+    status: 401,
+    ok: false,
+    json: async () => ({ error: 'Invalid or expired token.' })
+  });
+
+  await expect(pendingRequest).rejects.toThrow('Invalid or expired token.');
+  expect(sessionStorage.getItem('student-portal-token')).toBe('new-session-token');
+  expect(JSON.parse(sessionStorage.getItem('student-portal-session')).identifier).toBe('STU002');
+});
+
+test('clears the current session when verifyToken rejects that same stored token', async () => {
+  sessionStorage.setItem('student-portal-token', 'expired-session-token');
+  sessionStorage.setItem('student-portal-session', JSON.stringify({ token: 'expired-session-token', identifier: 'STU001' }));
+  global.fetch = jest.fn().mockResolvedValue({
+    status: 401,
+    ok: false,
+    json: async () => ({ error: 'Invalid or expired token.' })
+  });
+
+  await expect(verifyToken('expired-session-token')).rejects.toThrow('Invalid or expired token.');
+  expect(sessionStorage.getItem('student-portal-token')).toBeNull();
+  expect(sessionStorage.getItem('student-portal-session')).toBeNull();
+});
+
+test.each([400, 403, 500])('retains credentials after an unrelated HTTP %i response', async (status) => {
+  sessionStorage.setItem('student-portal-token', 'current-session-token');
+  sessionStorage.setItem('student-portal-session', JSON.stringify({ token: 'current-session-token', identifier: 'STU001' }));
+  global.fetch = jest.fn().mockResolvedValue({
+    status,
+    ok: false,
+    json: async () => ({ error: 'Request failed for another reason.' })
+  });
+
+  await expect(getAllUsers()).rejects.toThrow('Request failed for another reason.');
+  expect(sessionStorage.getItem('student-portal-token')).toBe('current-session-token');
+  expect(sessionStorage.getItem('student-portal-session')).not.toBeNull();
+  sessionStorage.clear();
 });

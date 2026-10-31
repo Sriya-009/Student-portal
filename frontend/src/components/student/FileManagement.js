@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { downloadProjectFile, uploadProjectFile } from '../../services/authService';
 
 function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, projectFiles, onFilesUpdate, projectName, actionMode }) {
@@ -8,6 +8,8 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
   const [fileVersion, setFileVersion] = useState('');
   const [editFileId, setEditFileId] = useState(null);
   const [editDescription, setEditDescription] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const uploadInFlight = useRef(false);
 
   const isProjectLead = projectLeadId === currentUserId;
   const projectFilesList = files.filter((f) => f.projectId === projectId);
@@ -52,10 +54,14 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
 
   const handleUploadFile = async (e) => {
     e.preventDefault();
+    if (uploadInFlight.current) return;
     if (!uploadedFile || !fileVersion.trim()) {
       alert('Please select a file and enter a description');
       return;
     }
+
+    uploadInFlight.current = true;
+    setIsUploading(true);
 
     const newFile = {
       id: `FILE-${Date.now()}`,
@@ -76,13 +82,19 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
     try {
       await uploadProjectFile(projectId, newFile.id, uploadedFile.file);
       const updatedFiles = [...files, newFile];
+      const metadataSaved = await onFilesUpdate?.(updatedFiles);
+      if (metadataSaved === false) {
+        throw new Error('The file was uploaded but its project details could not be saved. Please retry the upload.');
+      }
       setFiles(updatedFiles);
-      onFilesUpdate?.(updatedFiles);
       setUploadedFile(null);
       setFileVersion('');
       setShowUploadForm(false);
     } catch (error) {
       alert(error.message || 'Unable to upload file.');
+    } finally {
+      uploadInFlight.current = false;
+      setIsUploading(false);
     }
   };
 
@@ -419,7 +431,7 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
                 <h3>Upload Project File</h3>
                 <p>Add files to your project</p>
               </div>
-              <button type="button" className="icon-btn" onClick={() => setShowUploadForm(false)}>✕</button>
+              <button type="button" className="icon-btn" onClick={() => setShowUploadForm(false)} disabled={isUploading} aria-label="Close upload form">✕</button>
             </div>
 
             <label htmlFor="fileInput">Select File *</label>
@@ -448,9 +460,12 @@ function FileManagement({ projectId, projectLeadId, currentUserId, teamMembers, 
             />
 
             <div className="modal-actions">
-              <button type="button" className="outline-btn" onClick={() => setShowUploadForm(false)}>Cancel</button>
-              <button type="submit" className="primary-dark-btn">Upload File</button>
+              <button type="button" className="outline-btn" onClick={() => setShowUploadForm(false)} disabled={isUploading}>Cancel</button>
+              <button type="submit" className="primary-dark-btn" disabled={isUploading}>
+                {isUploading ? 'Uploading…' : 'Upload File'}
+              </button>
             </div>
+            {isUploading && <p className="upload-status" role="status">Uploading file. Please wait…</p>}
           </form>
         </div>
       ) : null}

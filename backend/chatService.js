@@ -9,6 +9,8 @@ const SYSTEM_PROMPT = [
 const DEFAULT_TIMEOUT_MS = 60000;
 const MAX_HISTORY_MESSAGES = 10;
 const MAX_MESSAGE_LENGTH = 2000;
+const DEFAULT_RETRY_ATTEMPTS = 2;
+const DEFAULT_RETRY_DELAY_MS = 250;
 
 function sanitizeProviderMessage(value, apiKey) {
   return String(value || 'Provider returned an error.')
@@ -40,6 +42,8 @@ function createProviderError(status, message) {
     error.code = 'AI_MODEL_OR_ENDPOINT_NOT_FOUND';
   } else if (status === 429) {
     error.code = 'AI_RATE_LIMITED';
+  } else if (status === 408) {
+    error.code = 'AI_TIMEOUT';
   } else if (status >= 500 && status <= 599) {
     error.code = 'AI_PROVIDER_UNAVAILABLE';
   } else {
@@ -47,6 +51,24 @@ function createProviderError(status, message) {
   }
   error.providerMessage = message;
   return error;
+}
+
+function getRetryConfig() {
+  const attempts = Number(process.env.AI_RETRY_ATTEMPTS || DEFAULT_RETRY_ATTEMPTS);
+  const delayMs = Number(process.env.AI_RETRY_DELAY_MS || DEFAULT_RETRY_DELAY_MS);
+  return {
+    attempts: Number.isInteger(attempts) && attempts >= 0 ? Math.min(attempts, 3) : DEFAULT_RETRY_ATTEMPTS,
+    delayMs: Number.isFinite(delayMs) && delayMs >= 0 ? Math.min(delayMs, 5000) : DEFAULT_RETRY_DELAY_MS
+  };
+}
+
+function waitForRetry(delayMs) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+function isRetryableNetworkError(error) {
+  return error?.name === 'TypeError'
+    || ['ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ENETUNREACH'].includes(error?.code);
 }
 
 function getProviderConfig() {
@@ -105,44 +127,79 @@ async function requestChatCompletion(message, history = []) {
     ...validateHistory(history),
     { role: 'user', content: message.trim() }
   ];
-  const timeoutMs = Number(process.env.AI_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS);
+  const configuredTimeoutMs = Number(process.env.AI_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
+  const timeoutMs = Number.isFinite(configuredTimeoutMs) && configuredTimeoutMs > 0
+    ? Math.min(configuredTimeoutMs, 120000)
+    : DEFAULT_TIMEOUT_MS;
+  const retryConfig = getRetryConfig();
 
-  try {
-    const response = await fetch(baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({ model, messages }),
-      signal: controller.signal
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const providerMessage = sanitizeProviderMessage(getProviderErrorMessage(payload, response), apiKey);
-      const error = createProviderError(response.status, providerMessage);
-      console.error(`Gemini provider HTTP ${response.status}: ${providerMessage}`);
+  for (let attempt = 0; attempt <= retryConfig.attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let response;
+    try {
+      response = await fetch(baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({ model, messages }),
+        signal: controller.signal
+      });
+    } catch (error) {
+      clearTimeout(timeout);
+      if (controller.signal.aborted || error.name === 'AbortError') {
+        const timeoutError = new Error('AI provider request timed out.');
+        timeoutError.code = 'AI_TIMEOUT';
+        throw timeoutError;
+      }
+      if (isRetryableNetworkError(error) && attempt < retryConfig.attempts) {
+        await waitForRetry(retryConfig.delayMs * (2 ** attempt));
+        continue;
+      }
       throw error;
     }
-    const content = payload?.choices?.[0]?.message?.content;
-    if (typeof content !== 'string' || !content.trim()) {
-      const error = new Error('AI provider returned an invalid response.');
-      error.code = 'AI_PROVIDER_ERROR';
-      throw error;
+
+    let payload;
+    try {
+      payload = await response.json().catch((error) => {
+        if (controller.signal.aborted || error.name === 'AbortError') {
+          const timeoutError = new Error('AI provider request timed out.');
+          timeoutError.code = 'AI_TIMEOUT';
+          throw timeoutError;
+        }
+        return {};
+      });
+    } finally {
+      clearTimeout(timeout);
     }
-    return content.trim();
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      const timeoutError = new Error('AI provider request timed out.');
-      timeoutError.code = 'AI_TIMEOUT';
-      throw timeoutError;
+
+    if (response.ok) {
+      const content = payload?.choices?.[0]?.message?.content;
+      if (typeof content !== 'string' || !content.trim()) {
+        const error = new Error('AI provider returned an invalid response.');
+        error.code = 'AI_PROVIDER_ERROR';
+        throw error;
+      }
+      return content.trim();
     }
+
+    const retryableStatus = (response.status >= 500 && response.status <= 599) || response.status === 408;
+    if (retryableStatus && attempt < retryConfig.attempts) {
+      await waitForRetry(retryConfig.delayMs * (2 ** attempt));
+      continue;
+    }
+
+    const providerMessage = sanitizeProviderMessage(getProviderErrorMessage(payload, response), apiKey);
+    const error = createProviderError(response.status, providerMessage);
+    console.error(`Gemini provider HTTP ${response.status} (${error.code}).`);
     throw error;
-  } finally {
-    clearTimeout(timeout);
   }
+
+  const unavailableError = new Error('AI provider is temporarily unavailable.');
+  unavailableError.code = 'AI_PROVIDER_UNAVAILABLE';
+  throw unavailableError;
 }
 
 module.exports = { requestChatCompletion, SYSTEM_PROMPT };
